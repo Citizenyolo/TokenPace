@@ -46,7 +46,6 @@ class QuotaObserver: ObservableObject {
     }
     
     private func handleDatabaseChange() {
-        try? "Database change detected, debouncing...\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
         debounceTimer?.invalidate()
         debounceTimer = Timer.scheduledTimer(withTimeInterval: debounceInterval, repeats: false) { [weak self] _ in
             self?.fetchAndPublish()
@@ -90,9 +89,7 @@ class QuotaObserver: ObservableObject {
                 let timeUntilFire = fireDate.timeIntervalSince(Date())
                 
                 if timeUntilFire > 0 {
-                    try? "Scheduling next fetch in \(timeUntilFire) seconds (at \(fireDate))\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
                     self?.resetTimer = Timer.scheduledTimer(withTimeInterval: timeUntilFire, repeats: false) { _ in
-                        try? "Auto-fetch triggered from reset timer!\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
                         self?.fetchAndPublish()
                     }
                 }
@@ -103,25 +100,22 @@ class QuotaObserver: ObservableObject {
     private func fetchAndPublish() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let data = QuotaFetcher.fetchQuota() else {
-                try? "Fetch failed\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
                 return
             }
-            
-            try? "Fetched data successfully\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
             
             // Save directly to the Widget's Sandbox Container
             let fileManager = FileManager.default
             let homeDir = fileManager.homeDirectoryForCurrentUser
-            let widgetDocsDir = homeDir.appendingPathComponent("Library/Containers/\(Bundle.main.bundleIdentifier!)Extension/Data/Documents")
+            guard let bundleId = Bundle.main.bundleIdentifier else { return }
+            let widgetDocsDir = homeDir.appendingPathComponent("Library/Containers/\(bundleId)Extension/Data/Documents")
             
             do {
                 try fileManager.createDirectory(at: widgetDocsDir, withIntermediateDirectories: true, attributes: nil)
                 let fileURL = widgetDocsDir.appendingPathComponent("quota.json")
                 let encoded = try JSONEncoder().encode(data)
                 try encoded.write(to: fileURL, options: .atomic)
-                try? "Saved to Sandbox\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
             } catch {
-                try? "Failed to write quota.json: \(error)\n".appendLineToURL(fileURL: URL(fileURLWithPath: "/tmp/agy_widget.log"))
+                print("Failed to write quota.json: \(error)")
             }
             
             // Trigger Widget reload
@@ -129,19 +123,6 @@ class QuotaObserver: ObservableObject {
             
             // Schedule the auto-fetch for the next quota reset
             self?.scheduleNextResetFetch(from: data)
-        }
-    }
-}
-
-extension String {
-    func appendLineToURL(fileURL: URL) throws {
-        let data = self.data(using: .utf8)!
-        if let fileHandle = FileHandle(forWritingAtPath: fileURL.path) {
-            defer { fileHandle.closeFile() }
-            fileHandle.seekToEndOfFile()
-            fileHandle.write(data)
-        } else {
-            try data.write(to: fileURL, options: .atomic)
         }
     }
 }

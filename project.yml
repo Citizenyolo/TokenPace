@@ -1,6 +1,6 @@
 name: TokenPace
 options:
-  bundleIdPrefix: com.zoltanhaas
+  bundleIdPrefix: io.github.citizenyolo
 targets:
   TokenPace:
     type: application

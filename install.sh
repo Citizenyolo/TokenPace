@@ -2,19 +2,28 @@
 set -e
 
 echo "==> Building TokenPace..."
-# Ensure XcodeGen is installed
+# Ensure dependencies are installed
 if ! command -v xcodegen &> /dev/null; then
     echo "Error: xcodegen is not installed. Please install it with 'brew install xcodegen'."
     exit 1
 fi
 
+if ! command -v xcodebuild &> /dev/null; then
+    echo "Error: xcodebuild is not installed. Please install Xcode Command Line Tools."
+    exit 1
+fi
+
+if [ ! -f ~/.local/bin/agy ]; then
+    echo "Warning: ~/.local/bin/agy not found. The widget requires the Agy CLI to function."
+fi
+
 xcodegen generate
-xcodebuild -project TokenPace.xcodeproj -scheme TokenPace build | grep -v 'note:' | grep -v 'warning:'
+xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$(pwd)/build" build | grep -v 'note:' | grep -v 'warning:'
 
 # Find the built app
-APP_BUNDLE=$(find ~/Library/Developer/Xcode/DerivedData -name "TokenPace.app" -type d -print | grep 'Build/Products' | head -n 1)
-if [ -z "$APP_BUNDLE" ]; then
-    echo "Error: TokenPace.app not found in DerivedData."
+APP_BUNDLE="$(pwd)/build/Debug/TokenPace.app"
+if [ ! -d "$APP_BUNDLE" ]; then
+    echo "Error: TokenPace.app not found in expected build directory."
     exit 1
 fi
 

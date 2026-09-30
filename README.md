@@ -85,7 +85,7 @@ To completely remove TokenPace:
 killall TokenPace
 killall TokenPaceExtension
 rm -rf ~/Applications/TokenPace.app
-rm -rf ~/Library/Containers/$(osascript -e 'id of app "TokenPace"' 2>/dev/null || echo "com.zoltanhaas.TokenPace")Extension
+rm -rf ~/Library/Containers/$(osascript -e 'id of app "TokenPace"' 2>/dev/null || echo "io.github.citizenyolo.TokenPace")Extension
 ```
 
 ## Privacy & Security
