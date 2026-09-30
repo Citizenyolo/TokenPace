@@ -1,0 +1,17 @@
+# Xcode
+build/
+*.pbxproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+.swiftpm/
+
+# OS
+.DS_Store
+
+# XcodeGen
+TokenPace.xcodeproj/
+
+# Built products
+*.app/
+*.appex/

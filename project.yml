@@ -1,0 +1,47 @@
+name: TokenPace
+options:
+  bundleIdPrefix: com.zoltanhaas
+targets:
+  TokenPace:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources: 
+      - Sources/TokenPace
+      - Sources/Shared
+    settings:
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGN_STYLE: Manual
+      DEVELOPMENT_TEAM: ""
+      ENABLE_USER_SCRIPT_SANDBOXING: NO
+      CODE_SIGN_ENTITLEMENTS: Entitlements.entitlements
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: Info.plist
+      properties:
+        LSUIElement: YES
+    entitlements:
+      path: Entitlements.entitlements
+    dependencies:
+      - target: TokenPaceExtension
+        embed: true
+  TokenPaceExtension:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources: 
+      - Sources/TokenPaceExtension
+      - Sources/Shared
+    settings:
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGN_STYLE: Manual
+      DEVELOPMENT_TEAM: ""
+      ENABLE_USER_SCRIPT_SANDBOXING: NO
+      CODE_SIGN_ENTITLEMENTS: ExtensionEntitlements.entitlements
+    info:
+      path: ExtensionInfo.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: ExtensionEntitlements.entitlements
