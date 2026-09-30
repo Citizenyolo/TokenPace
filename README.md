@@ -4,7 +4,7 @@ TokenPace is a native, headless macOS widget that monitors your Google Antigravi
 
 *Note: TokenPace is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Google. Google, Antigravity, and Agy are trademarks of their respective owners.*
 
-<!-- PLACEHOLDER FOR SCREENSHOT: Add a screenshot of the widget here -->
+![TokenPace Widget Preview](Preview.png)
 
 ## Features
 
