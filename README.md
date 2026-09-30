@@ -1,6 +1,6 @@
 # TokenPace
 
-TokenPace is a native, headless macOS widget that monitors your Google Antigravity (Agy) API quota usage. It sits quietly on your desktop or Notification Center, tracking both your 5-hour and 7-day limits, visually warning you if your usage pace is overburning or safely conserving quota.
+TokenPace is a native, headless macOS widget that monitors your Google Antigravity (Agy) quota and usage pace. It sits quietly on your desktop or Notification Center, tracking both your 5-hour and 7-day limits, visually warning you if your usage pace is overburning or safely conserving quota.
 
 *Note: TokenPace is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Google. Google, Antigravity, and Agy are trademarks of their respective owners.*
 
@@ -22,7 +22,7 @@ TokenPace is a native, headless macOS widget that monitors your Google Antigravi
 TokenPace is split into two components: an invisible macOS application (the daemon) and a WidgetKit Extension.
 
 1. **Detection:** The daemon observes your `~/.gemini/antigravity-cli/conversations` and `~/.gemini/antigravity-ide/conversations` directories for SQLite database modifications (indicating active CLI or GUI usage).
-2. **Quota Fetching:** When activity is detected, the daemon fetches quota directly by running `~/.local/bin/agy --output-format json -p /usage`. It uses your locally authenticated credentials—nothing is transmitted externally.
+2. **Quota Fetching:** When activity is detected, the daemon fetches quota purely by invoking your locally installed `~/.local/bin/agy --output-format json -p /usage`. TokenPace itself makes no network requests; quota retrieval is delegated entirely to the authenticated Agy CLI.
 3. **Sandbox Handoff:** Apple strictly limits WidgetKit apps unless you possess a paid Developer Account. To allow free compilation and installation, TokenPace uses an unsandboxed helper daemon that writes the fetched JSON directly into the Widget Extension's secure sandbox (`~/Library/Containers/<BundleID>Extension/Data/Documents/quota.json`), and then triggers a timeline reload.
 4. **Widget Timelines:** Once the widget receives the JSON, it generates a timeline of 120 minute-by-minute entries. This allows the widget to tick down the "Refreshes in Xh Ym" text dynamically on your desktop *without* waking up the daemon or spamming the Agy API.
 5. **Optimistic Resets:** If a timeline entry surpasses a cached reset timestamp, the widget artificially (and optimistically) displays 100% quota and a "Quota available" label until the background daemon performs its scheduled authoritative fetch.
@@ -98,7 +98,7 @@ TokenPace respects your privacy and is completely local.
 
 ## Limitations
 
-- **Timeline Precision:** Apple's WidgetKit controls exact redraw cycles. The "Refreshes in" timer may occasionally update a few seconds late depending on system battery/performance limits.
+- **Timeline Precision:** Apple's WidgetKit independently controls timeline redraw budgets and scheduling logic. Therefore, widget updates and countdown changes are not guaranteed to occur at exact minute boundaries, and updates may be deferred based on system power or performance conditions.
 - **Path Dependency:** Assumes `agy` is installed at `~/.local/bin/agy`.
 - **API Stability:** Relies on the internal JSON structure of `agy /usage`. Changes by Google could break parsing.
 
