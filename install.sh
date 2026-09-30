@@ -27,6 +27,9 @@ if [ ! -d "$APP_BUNDLE" ]; then
     exit 1
 fi
 
+echo "==> Stripping iCloud/Finder detritus before signing..."
+xattr -cr "$APP_BUNDLE"
+
 echo "==> Manually signing extension and app (bypassing Developer Account restriction)..."
 codesign --force --sign - --entitlements ExtensionEntitlements.entitlements "$APP_BUNDLE/Contents/PlugIns/TokenPaceExtension.appex"
 codesign --force --sign - --entitlements Entitlements.entitlements "$APP_BUNDLE"
