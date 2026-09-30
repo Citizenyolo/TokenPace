@@ -45,3 +45,5 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
       path: ExtensionEntitlements.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
