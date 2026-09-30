@@ -18,16 +18,20 @@ if [ ! -f ~/.local/bin/agy ]; then
 fi
 
 xcodegen generate
-xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$(pwd)/build" build | grep -v 'note:' | grep -v 'warning:'
+# Use a build directory outside iCloud Drive to avoid com.apple.fileprovider detritus breaking codesign
+BUILD_DIR="/tmp/TokenPace_build_$$"
+mkdir -p "$BUILD_DIR"
+
+xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$BUILD_DIR" build | grep -v 'note:' | grep -v 'warning:'
 
 # Find the built app
-APP_BUNDLE="$(pwd)/build/Debug/TokenPace.app"
+APP_BUNDLE="$BUILD_DIR/Debug/TokenPace.app"
 if [ ! -d "$APP_BUNDLE" ]; then
     echo "Error: TokenPace.app not found in expected build directory."
     exit 1
 fi
 
-echo "==> Stripping iCloud/Finder detritus before signing..."
+echo "==> Stripping any remaining detritus before signing..."
 xattr -cr "$APP_BUNDLE"
 
 echo "==> Manually signing extension and app (bypassing Developer Account restriction)..."
