@@ -161,7 +161,7 @@ struct TokenPaceEntryView : View {
                             let effPct = getEffectivePercentage(cachedPercentage: d.gemini5hRemaining, resetTime: d.gemini5hResetTime, currentDate: entry.date)
                             QuotaBar(percentage: effPct)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.black).bold()
+                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
                         }
                         Text("  " + formatRefreshText(from: d.gemini5hResetTime, currentDate: entry.date)).foregroundColor(.green)
                     }
@@ -177,7 +177,7 @@ struct TokenPaceEntryView : View {
                             let effPct = getEffectivePercentage(cachedPercentage: d.geminiWeeklyRemaining, resetTime: d.geminiWeeklyResetTime, currentDate: entry.date)
                             QuotaBar(percentage: effPct)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.black).bold()
+                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
                         }
                         Text("  " + formatRefreshText(from: d.geminiWeeklyResetTime, currentDate: entry.date)).foregroundColor(.green)
                     }
@@ -197,7 +197,7 @@ struct TokenPaceEntryView : View {
                             let effPct = getEffectivePercentage(cachedPercentage: d.claude5hRemaining, resetTime: d.claude5hResetTime, currentDate: entry.date)
                             QuotaBar(percentage: effPct)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.black).bold()
+                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
                         }
                         Text("  " + formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)).foregroundColor(.green)
                     }
@@ -213,7 +213,7 @@ struct TokenPaceEntryView : View {
                             let effPct = getEffectivePercentage(cachedPercentage: d.claudeWeeklyRemaining, resetTime: d.claudeWeeklyResetTime, currentDate: entry.date)
                             QuotaBar(percentage: effPct)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.black).bold()
+                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
                         }
                         Text("  " + formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)).foregroundColor(.green)
                     }
@@ -225,7 +225,7 @@ struct TokenPaceEntryView : View {
         .font(.system(size: 14, weight: .regular, design: .monospaced))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding()
-        .foregroundColor(.black)
+        .foregroundColor(.primary)
     }
 }
 
@@ -236,7 +236,7 @@ struct TokenPaceExtension: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             TokenPaceEntryView(entry: entry)
-                .containerBackground(Color.white, for: .widget)
+                .containerBackground(Color(NSColor.windowBackgroundColor), for: .widget)
         }
         .configurationDisplayName("TokenPace")
         .description("Displays Agy CLI quota usage.")

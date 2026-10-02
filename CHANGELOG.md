@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-10-02
+### Added
+- Dark Mode Support: The widget now natively supports macOS Dark Mode. Text and background colors dynamically adapt to the system appearance setting for a seamless visual experience.
+
 ## [1.0.2] - 2026-10-02
 ### Changed
 - Improved remaining time formatting: displays as "Resets in X days Yh Zm" for durations over 24 hours.
