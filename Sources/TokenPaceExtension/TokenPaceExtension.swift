@@ -110,13 +110,23 @@ struct TokenPaceEntryView : View {
             return "Quota available"
         }
         
-        let hours = Int(timeInterval) / 3600
+        let totalHours = Int(timeInterval) / 3600
         let minutes = (Int(timeInterval) % 3600) / 60
         
-        if hours > 0 {
-            return "Refreshes in \(hours)h \(minutes)m"
+        if totalHours >= 24 {
+            let days = totalHours / 24
+            let remainingHours = totalHours % 24
+            let dayString = days == 1 ? "day" : "days"
+            
+            if remainingHours > 0 {
+                return "Resets in \(days) \(dayString) \(remainingHours)h \(minutes)m"
+            } else {
+                return "Resets in \(days) \(dayString) \(minutes)m"
+            }
+        } else if totalHours > 0 {
+            return "Resets in \(totalHours)h \(minutes)m"
         } else {
-            return "Refreshes in \(minutes)m"
+            return "Resets in \(minutes)m"
         }
     }
     
