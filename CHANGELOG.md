@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-10-03
+### Fixed
+- **Daemon Lifecycle:** Hardened `install.sh` and uninstall instructions to use modern `launchctl bootout/bootstrap` targeting service identities, cleanly preventing zombie respawns and ghost processes.
+- **Cache Staleness Logic:** The widget now correctly detects when it has lost contact with the background daemon (or if an active network connection is unavailable) and conservatively falls back to "Data stale", completely eliminating false "100% Quota available" inferences.
+- **Quota Synchronization:** `QuotaObserver` now utilizes an exponential backoff loop for transient network failures. Strict sequence IDs ensure that obsolete, delayed network responses can no longer silently overwrite fresh data fetches.
+
 ## [1.1.0] - 2026-10-02
 ### Added
 - Dark Mode Support: The widget now natively supports macOS Dark Mode. Text and background colors dynamically adapt to the system appearance setting for a seamless visual experience.
