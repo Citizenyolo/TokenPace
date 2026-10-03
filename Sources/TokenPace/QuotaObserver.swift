@@ -53,7 +53,6 @@ class QuotaObserver: ObservableObject {
     }
     
     private func scheduleNextResetFetch(from data: QuotaData) {
-        let formatter = SharedFormatters.iso8601
         
         let resetStrings = [
             data.geminiWeeklyResetTime,
@@ -66,7 +65,7 @@ class QuotaObserver: ObservableObject {
         var nextResetDate: Date? = nil
         
         for dateString in resetStrings {
-            if let date = formatter.date(from: dateString) {
+            if let date = try? Date(dateString, strategy: .iso8601) {
                 if date > currentDate {
                     if let currentNext = nextResetDate {
                         if date < currentNext {

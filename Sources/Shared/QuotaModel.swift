@@ -1,13 +1,5 @@
 import Foundation
 
-enum SharedFormatters {
-    static let iso8601: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-}
-
 struct QuotaData: Codable, Equatable {
     var geminiWeeklyRemaining: Double
     var geminiWeeklyResetTime: String
