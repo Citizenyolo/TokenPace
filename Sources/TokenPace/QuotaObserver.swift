@@ -53,8 +53,7 @@ class QuotaObserver: ObservableObject {
     }
     
     private func scheduleNextResetFetch(from data: QuotaData) {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        let formatter = SharedFormatters.iso8601
         
         let resetStrings = [
             data.geminiWeeklyResetTime,

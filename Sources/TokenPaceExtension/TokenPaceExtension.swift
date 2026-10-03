@@ -53,8 +53,7 @@ struct PacingIndicator: View {
     let cycleDurationSeconds: TimeInterval
     
     var indicatorText: (String, Color)? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        let formatter = SharedFormatters.iso8601
         guard let cycleEnd = formatter.date(from: resetTimeString) else { return nil }
         
         let cycleStart = cycleEnd.addingTimeInterval(-cycleDurationSeconds)
@@ -98,8 +97,7 @@ struct TokenPaceEntryView : View {
     var entry: Provider.Entry
     
     func formatRefreshText(from dateString: String, currentDate: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        let formatter = SharedFormatters.iso8601
         guard let targetDate = formatter.date(from: dateString) else {
             return "Quota available"
         }
@@ -131,8 +129,7 @@ struct TokenPaceEntryView : View {
     }
     
     func getEffectivePercentage(cachedPercentage: Double, resetTime: String, currentDate: Date) -> Double {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
+        let formatter = SharedFormatters.iso8601
         guard let targetDate = formatter.date(from: resetTime) else {
             return cachedPercentage
         }
