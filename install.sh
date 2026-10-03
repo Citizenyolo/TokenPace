@@ -2,7 +2,6 @@
 set -e
 
 echo "==> Building TokenPace..."
-# Ensure dependencies are installed
 if ! command -v xcodegen &> /dev/null; then
     echo "Error: xcodegen is not installed. Please install it with 'brew install xcodegen'."
     exit 1
@@ -13,18 +12,12 @@ if ! command -v xcodebuild &> /dev/null; then
     exit 1
 fi
 
-if [ ! -f ~/.local/bin/agy ]; then
-    echo "Warning: ~/.local/bin/agy not found. The widget requires the Agy CLI to function."
-fi
-
 xcodegen generate
-# Use a build directory outside iCloud Drive to avoid com.apple.fileprovider detritus breaking codesign
 BUILD_DIR="/tmp/TokenPace_build_$$"
 mkdir -p "$BUILD_DIR"
 
 xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$BUILD_DIR" build | grep -v 'note:' | grep -v 'warning:'
 
-# Find the built app
 APP_BUNDLE="$BUILD_DIR/Debug/TokenPace.app"
 if [ ! -d "$APP_BUNDLE" ]; then
     echo "Error: TokenPace.app not found in expected build directory."
@@ -38,17 +31,54 @@ echo "==> Manually signing extension and app (bypassing Developer Account restri
 codesign --force --sign - --entitlements ExtensionEntitlements.entitlements "$APP_BUNDLE/Contents/PlugIns/TokenPaceExtension.appex"
 codesign --force --sign - --entitlements Entitlements.entitlements "$APP_BUNDLE"
 
-echo "==> Installing to ~/Applications..."
-mkdir -p ~/Applications
+PLIST_PATH="$HOME/Library/LaunchAgents/io.github.citizenyolo.TokenPaceDaemon.plist"
+USER_ID=$(id -u)
+SERVICE_TARGET="gui/$USER_ID/io.github.citizenyolo.TokenPaceDaemon"
+
+echo "==> Unloading existing daemon..."
+if launchctl print "$SERVICE_TARGET" &>/dev/null; then
+    launchctl bootout "$SERVICE_TARGET"
+fi
+
+# Ensure process is dead
 killall TokenPace 2>/dev/null || true
 killall TokenPaceExtension 2>/dev/null || true
+
+echo "==> Installing to ~/Applications..."
+mkdir -p ~/Applications
 rm -rf ~/Applications/TokenPace.app
 cp -R "$APP_BUNDLE" ~/Applications/TokenPace.app
 
 echo "==> Registering with macOS LaunchServices..."
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/Applications/TokenPace.app
 
-echo "==> Starting TokenPace daemon..."
-open ~/Applications/TokenPace.app
+echo "==> Configuring LaunchAgent daemon..."
+mkdir -p "$HOME/Library/LaunchAgents"
+
+# XML-escape the path just in case
+APP_PATH="$HOME/Applications/TokenPace.app/Contents/MacOS/TokenPace"
+ESCAPED_APP_PATH=$(echo "$APP_PATH" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
+
+cat <<PLIST > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.github.citizenyolo.TokenPaceDaemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${ESCAPED_APP_PATH}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+
+echo "==> Bootstrapping new daemon..."
+launchctl bootstrap gui/$USER_ID "$PLIST_PATH"
 
 echo "✅ Installation complete! You can now add the TokenPace widget to your desktop or Notification Center."

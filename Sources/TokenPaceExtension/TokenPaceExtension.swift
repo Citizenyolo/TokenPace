@@ -18,23 +18,42 @@ struct Provider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         var data: QuotaData? = nil
-        let fileManager = FileManager.default
-        let homeDir = fileManager.homeDirectoryForCurrentUser
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let fileURL = homeDir.appendingPathComponent("Documents/quota.json")
         
-        if let saved = try? Data(contentsOf: fileURL) {
-            data = try? JSONDecoder().decode(QuotaData.self, from: saved)
+        // Atomically read data using a single FileHandle snapshot
+        if let handle = try? FileHandle(forReadingFrom: fileURL) {
+            if let saved = try? handle.readToEnd() {
+                data = try? JSONDecoder().decode(QuotaData.self, from: saved)
+            }
+            try? handle.close()
         }
         
         var entries: [SimpleEntry] = []
         let currentDate = Date()
         
-        // Generate an entry every minute for the next 2 hours
+        // M5: Ensure stale transition is actually in the timeline even if reset occurs near end
+        // Generate an entry every minute for 120 minutes.
         for minuteOffset in 0 ..< 120 {
             if let entryDate = Calendar.current.date(byAdding: .minute, value: minuteOffset, to: currentDate) {
                 entries.append(SimpleEntry(date: entryDate, data: data))
             }
         }
+        
+        // Ensure reset transitions are in the timeline
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let d = data {
+            let resetStrings = [d.geminiWeeklyResetTime, d.gemini5hResetTime, d.claudeWeeklyResetTime, d.claude5hResetTime]
+            for rString in resetStrings {
+                if let rDate = formatter.date(from: rString), rDate > currentDate, rDate <= currentDate.addingTimeInterval(120 * 60) {
+                    entries.append(SimpleEntry(date: rDate, data: data))
+                }
+            }
+        }
+        
+        // Sort entries by date to be safe
+        entries.sort { $0.date < $1.date }
         
         let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
@@ -57,10 +76,14 @@ struct PacingIndicator: View {
         formatter.formatOptions = [.withInternetDateTime]
         guard let cycleEnd = formatter.date(from: resetTimeString) else { return nil }
         
+        if currentDate >= cycleEnd {
+            return nil // Data is stale; do not imply pacing from expired data
+        }
+        
         let cycleStart = cycleEnd.addingTimeInterval(-cycleDurationSeconds)
         let timeElapsed = currentDate.timeIntervalSince(cycleStart)
         
-        let actualPct: Double = (currentDate >= cycleEnd) ? 1.0 : cachedPercentage
+        let actualPct = cachedPercentage
         
         let idealPct: Double
         if timeElapsed >= cycleDurationSeconds || timeElapsed <= 0 {
@@ -97,17 +120,18 @@ struct PacingIndicator: View {
 struct TokenPaceEntryView : View {
     var entry: Provider.Entry
     
-    func formatRefreshText(from dateString: String, currentDate: Date) -> String {
+    // M1 Fix: strictly conservative reset text. Never fabricate availability.
+    func formatRefreshText(from dateString: String, currentDate: Date) -> (String, Color) {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         guard let targetDate = formatter.date(from: dateString) else {
-            return "Quota available"
+            return ("Unknown reset time", .secondary)
         }
         
         let timeInterval = targetDate.timeIntervalSince(currentDate)
         
         if timeInterval <= 0 {
-            return "Quota available"
+            return ("Data stale", .secondary)
         }
         
         let totalHours = Int(timeInterval) / 3600
@@ -119,29 +143,15 @@ struct TokenPaceEntryView : View {
             let dayString = days == 1 ? "day" : "days"
             
             if remainingHours > 0 {
-                return "Resets in \(days) \(dayString) \(remainingHours)h \(minutes)m"
+                return ("Resets in \(days) \(dayString) \(remainingHours)h \(minutes)m", .green)
             } else {
-                return "Resets in \(days) \(dayString) \(minutes)m"
+                return ("Resets in \(days) \(dayString) \(minutes)m", .green)
             }
         } else if totalHours > 0 {
-            return "Resets in \(totalHours)h \(minutes)m"
+            return ("Resets in \(totalHours)h \(minutes)m", .green)
         } else {
-            return "Resets in \(minutes)m"
+            return ("Resets in \(minutes)m", .green)
         }
-    }
-    
-    func getEffectivePercentage(cachedPercentage: Double, resetTime: String, currentDate: Date) -> Double {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        guard let targetDate = formatter.date(from: resetTime) else {
-            return cachedPercentage
-        }
-        
-        if targetDate.timeIntervalSince(currentDate) <= 0 {
-            return 1.0
-        }
-        
-        return cachedPercentage
     }
 
     var body: some View {
@@ -158,12 +168,12 @@ struct TokenPaceEntryView : View {
                         }
                         HStack(spacing: 0) {
                             Text("  [")
-                            let effPct = getEffectivePercentage(cachedPercentage: d.gemini5hRemaining, resetTime: d.gemini5hResetTime, currentDate: entry.date)
-                            QuotaBar(percentage: effPct)
+                            QuotaBar(percentage: d.gemini5hRemaining)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
+                            Text(String(format: "%.0f%%", d.gemini5hRemaining * 100)).foregroundColor(.primary).bold()
                         }
-                        Text("  " + formatRefreshText(from: d.gemini5hResetTime, currentDate: entry.date)).foregroundColor(.green)
+                        let refreshInfo = formatRefreshText(from: d.gemini5hResetTime, currentDate: entry.date)
+                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -174,12 +184,12 @@ struct TokenPaceEntryView : View {
                         }
                         HStack(spacing: 0) {
                             Text("  [")
-                            let effPct = getEffectivePercentage(cachedPercentage: d.geminiWeeklyRemaining, resetTime: d.geminiWeeklyResetTime, currentDate: entry.date)
-                            QuotaBar(percentage: effPct)
+                            QuotaBar(percentage: d.geminiWeeklyRemaining)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
+                            Text(String(format: "%.0f%%", d.geminiWeeklyRemaining * 100)).foregroundColor(.primary).bold()
                         }
-                        Text("  " + formatRefreshText(from: d.geminiWeeklyResetTime, currentDate: entry.date)).foregroundColor(.green)
+                        let refreshInfo = formatRefreshText(from: d.geminiWeeklyResetTime, currentDate: entry.date)
+                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
                     }
                 }
                 
@@ -194,12 +204,12 @@ struct TokenPaceEntryView : View {
                         }
                         HStack(spacing: 0) {
                             Text("  [")
-                            let effPct = getEffectivePercentage(cachedPercentage: d.claude5hRemaining, resetTime: d.claude5hResetTime, currentDate: entry.date)
-                            QuotaBar(percentage: effPct)
+                            QuotaBar(percentage: d.claude5hRemaining)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
+                            Text(String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
                         }
-                        Text("  " + formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)).foregroundColor(.green)
+                        let refreshInfo = formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)
+                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -210,12 +220,12 @@ struct TokenPaceEntryView : View {
                         }
                         HStack(spacing: 0) {
                             Text("  [")
-                            let effPct = getEffectivePercentage(cachedPercentage: d.claudeWeeklyRemaining, resetTime: d.claudeWeeklyResetTime, currentDate: entry.date)
-                            QuotaBar(percentage: effPct)
+                            QuotaBar(percentage: d.claudeWeeklyRemaining)
                             Text("] ")
-                            Text(String(format: "%.0f%%", effPct * 100)).foregroundColor(.primary).bold()
+                            Text(String(format: "%.0f%%", d.claudeWeeklyRemaining * 100)).foregroundColor(.primary).bold()
                         }
-                        Text("  " + formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)).foregroundColor(.green)
+                        let refreshInfo = formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)
+                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
                     }
                 }
             } else {
