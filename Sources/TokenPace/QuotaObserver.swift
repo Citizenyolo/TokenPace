@@ -7,6 +7,7 @@ class QuotaObserver: ObservableObject {
     private var debounceTimer: Timer?
     private let debounceInterval: TimeInterval = 3.0
     private var resetTimer: Timer?
+    private var pendingFetchWorkItem: DispatchWorkItem?
     
     init() {
         // Initial fetch
@@ -95,32 +96,64 @@ class QuotaObserver: ObservableObject {
         }
     }
     
-    private func fetchAndPublish() {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+    private func scheduleRetry(retryCount: Int, delay: TimeInterval) {
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.fetchAndPublish(retryCount: retryCount)
+        }
+        pendingFetchWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    private var currentFetchID: Int = 0
+
+    private func fetchAndPublish(retryCount: Int = 0) {
+        pendingFetchWorkItem?.cancel()
+        pendingFetchWorkItem = nil
+
+        currentFetchID += 1
+        let fetchID = currentFetchID
+
+        let fetchWork = DispatchWorkItem { [weak self] in
             guard let data = QuotaFetcher.fetchQuota() else {
+                if retryCount < 5 {
+                    let delay = min(pow(2.0, Double(retryCount)) * 10.0, 300.0)
+                    DispatchQueue.main.async {
+                        if self?.currentFetchID == fetchID {
+                            self?.scheduleRetry(retryCount: retryCount + 1, delay: delay)
+                        }
+                    }
+                }
                 return
             }
             
-            // Save directly to the Widget's Sandbox Container
-            let fileManager = FileManager.default
-            let homeDir = fileManager.homeDirectoryForCurrentUser
-            guard let bundleId = Bundle.main.bundleIdentifier else { return }
-            let widgetDocsDir = homeDir.appendingPathComponent("Library/Containers/\(bundleId)Extension/Data/Documents")
-            
-            do {
-                try fileManager.createDirectory(at: widgetDocsDir, withIntermediateDirectories: true, attributes: nil)
-                let fileURL = widgetDocsDir.appendingPathComponent("quota.json")
-                let encoded = try JSONEncoder().encode(data)
-                try encoded.write(to: fileURL, options: .atomic)
-            } catch {
-                print("Failed to write quota.json: \(error)")
+            // Move publication and state check back to the main queue to guarantee atomicity
+            // with respect to currentFetchID increments, avoiding race conditions post-check.
+            DispatchQueue.main.async {
+                guard self?.currentFetchID == fetchID else { return }
+
+                // Save directly to the Widget's Sandbox Container
+                let fileManager = FileManager.default
+                let homeDir = fileManager.homeDirectoryForCurrentUser
+                guard let bundleId = Bundle.main.bundleIdentifier else { return }
+                let widgetDocsDir = homeDir.appendingPathComponent("Library/Containers/\(bundleId)Extension/Data/Documents")
+
+                do {
+                    try fileManager.createDirectory(at: widgetDocsDir, withIntermediateDirectories: true, attributes: nil)
+                    let fileURL = widgetDocsDir.appendingPathComponent("quota.json")
+                    let encoded = try JSONEncoder().encode(data)
+                    try encoded.write(to: fileURL, options: .atomic)
+                } catch {
+                    print("Failed to write quota.json: \(error)")
+                }
+
+                // Trigger Widget reload
+                WidgetCenter.shared.reloadAllTimelines()
+
+                // Schedule the auto-fetch for the next quota reset
+                self?.scheduleNextResetFetch(from: data)
             }
-            
-            // Trigger Widget reload
-            WidgetCenter.shared.reloadAllTimelines()
-            
-            // Schedule the auto-fetch for the next quota reset
-            self?.scheduleNextResetFetch(from: data)
         }
+
+        DispatchQueue.global(qos: .userInitiated).async(execute: fetchWork)
     }
 }
