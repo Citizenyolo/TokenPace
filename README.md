@@ -17,6 +17,12 @@ TokenPace is a native, headless macOS widget that monitors your Google Antigravi
 - **Authoritative Resets:** Intelligently schedules a lightweight background refresh exactly one minute after your cycle officially resets to keep the widget precisely synced.
 - **Invisible Daemon:** Runs entirely in the background. No Dock icon, no Menu Bar clutter.
 
+
+## Known Issues
+
+- **[ISSUE1 (#2): Quota freshness and recovery after network interruptions (WIP)](https://github.com/Citizenyolo/TokenPace/issues/2)**
+  After prolonged offline periods, the widget's cached percentage and countdown do not currently prove true upstream data freshness. The existing reset-date protection prevents naive timeline extrapolation but does not guarantee accurate detection of stale data or network loss. Fixes for this are under local development and have not yet been merged.
+
 ## How it works
 
 TokenPace is split into two components: an invisible macOS application (the daemon) and a WidgetKit Extension.
@@ -25,7 +31,7 @@ TokenPace is split into two components: an invisible macOS application (the daem
 2. **Quota Fetching:** When activity is detected, the daemon fetches quota purely by invoking your locally installed `~/.local/bin/agy --output-format json -p /usage`. TokenPace itself makes no network requests; quota retrieval is delegated entirely to the authenticated Agy CLI.
 3. **Sandbox Handoff:** Apple strictly limits WidgetKit apps unless you possess a paid Developer Account. To allow free compilation and installation, TokenPace uses an unsandboxed helper daemon that writes the fetched JSON directly into the Widget Extension's secure sandbox (`~/Library/Containers/<BundleID>Extension/Data/Documents/quota.json`), and then triggers a timeline reload.
 4. **Widget Timelines:** Once the widget receives the JSON, it generates a timeline of 120 minute-by-minute entries. This allows the widget to tick down the "Refreshes in Xh Ym" text dynamically on your desktop *without* waking up the daemon or spamming the Agy API.
-5. **Stale Cache Detection:** If a timeline entry surpasses a cached reset timestamp, the widget conservatively maintains the last known valid percentage and displays "Data stale" until the background daemon performs its scheduled authoritative fetch. This prevents false "100% available" claims during network outages or daemon failures.
+5. **Stale Cache Detection:** If a timeline entry surpasses a cached reset timestamp, the widget conservatively displays "Data stale" until the background daemon performs its scheduled authoritative fetch. *(Note: this does not currently guarantee network offline detection; see Known Issues).* 
 
 ## Burn-rate / pacing calculation
 
