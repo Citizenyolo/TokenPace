@@ -51,10 +51,10 @@ struct Provider: TimelineProvider {
                 }
             }
         }
-        
+
         // Sort entries by date to be safe
         entries.sort { $0.date < $1.date }
-        
+
         let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
     }
@@ -72,10 +72,8 @@ struct PacingIndicator: View {
     let cycleDurationSeconds: TimeInterval
     
     var indicatorText: (String, Color)? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        guard let cycleEnd = formatter.date(from: resetTimeString) else { return nil }
-        
+        guard let cycleEnd = try? Date(resetTimeString, strategy: .iso8601) else { return nil }
+
         if currentDate >= cycleEnd {
             return nil // Data is stale; do not imply pacing from expired data
         }
@@ -122,9 +120,7 @@ struct TokenPaceEntryView : View {
     
     // M1 Fix: strictly conservative reset text. Never fabricate availability.
     func formatRefreshText(from dateString: String, currentDate: Date) -> (String, Color) {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        guard let targetDate = formatter.date(from: dateString) else {
+        guard let targetDate = try? Date(dateString, strategy: .iso8601) else {
             return ("Unknown reset time", .secondary)
         }
         

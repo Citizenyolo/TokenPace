@@ -54,8 +54,6 @@ class QuotaObserver: ObservableObject {
     }
     
     private func scheduleNextResetFetch(from data: QuotaData) {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
         
         let resetStrings = [
             data.geminiWeeklyResetTime,
@@ -68,7 +66,7 @@ class QuotaObserver: ObservableObject {
         var nextResetDate: Date? = nil
         
         for dateString in resetStrings {
-            if let date = formatter.date(from: dateString) {
+            if let date = try? Date(dateString, strategy: .iso8601) {
                 if date > currentDate {
                     if let currentNext = nextResetDate {
                         if date < currentNext {
@@ -111,10 +109,10 @@ class QuotaObserver: ObservableObject {
     private func fetchAndPublish(retryCount: Int = 0) {
         pendingFetchWorkItem?.cancel()
         pendingFetchWorkItem = nil
-        
+
         currentFetchID += 1
         let fetchID = currentFetchID
-        
+
         let fetchWork = DispatchWorkItem { [weak self] in
             guard let data = QuotaFetcher.fetchQuota() else {
                 if retryCount < 5 {
@@ -132,13 +130,13 @@ class QuotaObserver: ObservableObject {
             // with respect to currentFetchID increments, avoiding race conditions post-check.
             DispatchQueue.main.async {
                 guard self?.currentFetchID == fetchID else { return }
-                
+
                 // Save directly to the Widget's Sandbox Container
                 let fileManager = FileManager.default
                 let homeDir = fileManager.homeDirectoryForCurrentUser
                 guard let bundleId = Bundle.main.bundleIdentifier else { return }
                 let widgetDocsDir = homeDir.appendingPathComponent("Library/Containers/\(bundleId)Extension/Data/Documents")
-                
+
                 do {
                     try fileManager.createDirectory(at: widgetDocsDir, withIntermediateDirectories: true, attributes: nil)
                     let fileURL = widgetDocsDir.appendingPathComponent("quota.json")
@@ -147,15 +145,15 @@ class QuotaObserver: ObservableObject {
                 } catch {
                     print("Failed to write quota.json: \(error)")
                 }
-                
+
                 // Trigger Widget reload
                 WidgetCenter.shared.reloadAllTimelines()
-                
+
                 // Schedule the auto-fetch for the next quota reset
                 self?.scheduleNextResetFetch(from: data)
             }
         }
-        
+
         DispatchQueue.global(qos: .userInitiated).async(execute: fetchWork)
     }
 }
