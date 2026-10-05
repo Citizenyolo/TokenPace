@@ -13,8 +13,23 @@ if ! command -v xcodebuild &> /dev/null; then
 fi
 
 xcodegen generate
-BUILD_DIR="/tmp/TokenPace_build_$$"
-mkdir -p "$BUILD_DIR"
+
+# Allocate a secure, collision-resistant temporary directory
+BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/TokenPace_build_XXXXXXXX")
+
+# Setup cleanup on script exit or interrupt
+cleanup() {
+    local ext_status=$?
+    set +e
+    if [ -n "$BUILD_DIR" ] && [ -d "$BUILD_DIR" ]; then
+        rm -rf -- "$BUILD_DIR" >/dev/null 2>&1
+    fi
+    exit "$ext_status"
+}
+trap cleanup EXIT
+trap "exit 129" HUP
+trap "exit 130" INT
+trap "exit 143" TERM
 
 xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$BUILD_DIR" build | grep -v 'note:' | grep -v 'warning:'
 
