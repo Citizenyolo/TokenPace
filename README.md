@@ -21,7 +21,7 @@ TokenPace is a native, headless macOS widget that monitors your Google Antigravi
 ## Known Issues
 
 - **[ISSUE1 (#2): Quota freshness and recovery after network interruptions (WIP)](https://github.com/Citizenyolo/TokenPace/issues/2)**
-  After prolonged offline periods, the widget's cached percentage and countdown do not currently prove true upstream data freshness. The existing reset-date protection prevents naive timeline extrapolation but does not guarantee accurate detection of stale data or network loss. Fixes for this are under local development and have not yet been merged.
+  The local implementation now tracks successful CLI read age and retries failed reads. Installed-build verification, upstream CLI cache semantics and end-to-end offline/recovery acceptance remain outstanding; this is not approved for release.
 
 ## How it works
 
@@ -31,7 +31,7 @@ TokenPace is split into two components: an invisible macOS application (the daem
 2. **Quota Fetching:** When activity is detected, the daemon fetches quota purely by invoking your locally installed `~/.local/bin/agy --output-format json -p /usage`. TokenPace itself makes no network requests; quota retrieval is delegated entirely to the authenticated Agy CLI.
 3. **Sandbox Handoff:** Apple strictly limits WidgetKit apps unless you possess a paid Developer Account. To allow free compilation and installation, TokenPace uses an unsandboxed helper daemon that writes the fetched JSON directly into the Widget Extension's secure sandbox (`~/Library/Containers/<BundleID>Extension/Data/Documents/quota.json`), and then triggers a timeline reload.
 4. **Widget Timelines:** Once the widget receives the JSON, it generates a timeline of 120 minute-by-minute entries. This allows the widget to tick down the "Refreshes in Xh Ym" text dynamically on your desktop *without* waking up the daemon or spamming the Agy API.
-5. **Stale Cache Detection:** If a timeline entry surpasses a cached reset timestamp, the widget conservatively displays "Data stale" until the background daemon performs its scheduled authoritative fetch. *(Note: this does not currently guarantee network offline detection; see Known Issues).* 
+5. **Stale Cache Detection:** A successful, complete CLI read records `fetchedAt`. At 300 seconds old (or any expired reset), the widget labels the last known percentages "Data stale" and hides pacing indicators. Missing/future fetch timestamps cannot establish freshness. Malformed, partial, out-of-range or implausible-reset payloads are rejected; no reset fabricates 100% availability. Exact age/reset transitions are included in the timeline, subject to WidgetKit scheduling. This measures local read age, not guaranteed upstream freshness.
 
 ## Burn-rate / pacing calculation
 
@@ -56,7 +56,16 @@ deviation = actual_remaining_fraction - ideal_remaining
 | Minute passes | No | Yes (Advances Timeline) |
 | Cycle Reset Timestamp Reached | No | Yes (Data stale) |
 | Reset + 60 seconds | Yes (Scheduled Timer) | Yes (Authoritative Sync) |
-| Application Startup | Yes | Yes (Reloads Timeline) |
+| Application Startup | Yes (idempotent, single-flight) | On successful publication |
+| 240 seconds after successful publication | Yes | On successful publication |
+| Failed read or publication | Retry after 10, 20, 40, 80, 160, then 300 seconds indefinitely | Retains last known data; ages into stale |
+| Last successful read + 300 seconds | No | Data stale; no pacing indicator |
+
+The 240-second cadence leaves a 60-second margin before the 300-second stale boundary, including a bounded 30-second CLI invocation. Periodic, debounced activity and reset triggers share one coordinator; none bypass failure backoff or overlap a running read. Shutdown invalidates pending work and late responses. Reads also cap stdout at 1 MiB and require a zero exit status. Widget reload occurs only after atomic `quota.json` publication succeeds. Existing legacy cache files decode but are not considered fresh without `fetchedAt`.
+
+### Isolated regression checks
+
+Run `bash test_quota.sh` on macOS with Swift installed. This compiles production parsing, freshness, scheduling, subprocess and atomic file-store code against deterministic fixtures, an injected clock and temporary fake CLI executables; it also typechecks the daemon and widget. It never invokes the installed Agy CLI, accesses live quota files, installs/restarts the app, or changes connectivity. Covered cases include offline aging/recovery to actual fractions, reset/event/poll/retry coordination, publication failure, idempotent startup/shutdown, late responses, malformed/partial payloads and bounded subprocess failures.
 
 ## Requirements
 
@@ -122,6 +131,7 @@ TokenPace respects your privacy and is completely local.
 
 - **Timeline Precision:** Apple's WidgetKit independently controls timeline redraw budgets and scheduling logic. Therefore, widget updates and countdown changes are not guaranteed to occur at exact minute boundaries, and updates may be deferred based on system power or performance conditions.
 - **Path Dependency:** Assumes `agy` is installed at `~/.local/bin/agy`.
+- **Upstream Cache:** A successful CLI response may be cached upstream or inside Agy. `fetchedAt` is the local read completion time, not an upstream observation timestamp. This needs a controlled runtime check before release.
 - **API Stability:** Relies on the internal JSON structure of `agy /usage`. Changes by Google could break parsing.
 
 ## License

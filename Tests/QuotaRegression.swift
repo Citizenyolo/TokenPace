@@ -122,6 +122,25 @@ struct QuotaRegression {
         coordinator.stop(); clock = clock.addingTimeInterval(1000); coordinator.activity(); coordinator.tick()
         expect(completions.isEmpty, "shutdown cancels future work")
 
+        var resetClock = date
+        var resetCompletions: [(QuotaData?) -> Void] = []
+        var resetPublications = 0
+        let resetCoordinator = QuotaRefreshCoordinator(now: { resetClock },
+            fetch: { resetCompletions.append($0) }, publish: { _ in resetPublications += 1 })
+        resetCoordinator.start()
+        resetCompletions.removeFirst()(invalid)
+        resetClock = date.addingTimeInterval(69); resetCoordinator.tick()
+        expect(resetCompletions.isEmpty, "reset does not fetch before reset plus 60")
+        resetClock = date.addingTimeInterval(70); resetCoordinator.tick()
+        expect(resetCompletions.count == 1, "reset plus 60 preempts periodic refresh")
+        resetCompletions.removeFirst()(invalid)
+        expect(resetCoordinator.failures == 1 && resetPublications == 1, "expired response rejected")
+        resetClock = date.addingTimeInterval(80); resetCoordinator.tick()
+        var future = data; future.fetchedAt = resetClock.addingTimeInterval(1)
+        resetCompletions.removeFirst()(future)
+        expect(resetCoordinator.failures == 2 && resetPublications == 1, "future completion cannot publish")
+        resetCoordinator.stop()
+
         // Use a fake executable only; never invoke the installed CLI or live services.
         let executable = directory.appendingPathComponent("fake-agy")
         func script(_ contents: String) throws {
