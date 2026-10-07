@@ -19,7 +19,7 @@ struct QuotaRegression {
                 ["id": "3p-weekly", "remaining_fraction": 0.24, "reset_time": formatter.string(from: date.addingTimeInterval(604800))],
                 ["id": "3p-5h", "remaining_fraction": 0.13, "reset_time": formatter.string(from: date.addingTimeInterval(18000))]]]
         ]
-        return try! JSONSerialization.data(withJSONObject: ["command": ["data": ["groups": groups]]])
+        return try! JSONSerialization.data(withJSONObject: ["status": "SUCCESS", "command": ["name": "usage", "data": ["groups": groups]]])
     }
 
     static func main() throws {
@@ -54,6 +54,11 @@ struct QuotaRegression {
         expect(QuotaPolicy.resetDate("2027-01-15T08:00:00Z") != nil, "whole second ISO reset")
         expect(QuotaFetcher.parse(Data("{}".utf8), fetchedAt: date) == nil, "malformed payload")
         let text = String(data: bytes, encoding: .utf8)!
+        expect(QuotaFetcher.parse(Data(text.replacingOccurrences(of: "SUCCESS", with: "ERROR").utf8), fetchedAt: date) == nil, "error envelope cannot publish otherwise-valid quota")
+        expect(QuotaFetcher.parse(Data(text.replacingOccurrences(of: "\"usage\"", with: "\"other\"").utf8), fetchedAt: date) == nil, "wrong command cannot publish quota")
+        var envelope = try JSONSerialization.jsonObject(with: bytes) as! [String: Any]
+        envelope.removeValue(forKey: "status")
+        expect(QuotaFetcher.parse(try! JSONSerialization.data(withJSONObject: envelope), fetchedAt: date) == nil, "missing status cannot claim success")
         for replacement in ["null", "-0.1", "1.1", "\"bad\""] {
             expect(QuotaFetcher.parse(Data(text.replacingOccurrences(of: "0.31", with: replacement).utf8), fetchedAt: date) == nil, "invalid bucket cannot publish")
         }
@@ -140,6 +145,57 @@ struct QuotaRegression {
         resetCompletions.removeFirst()(future)
         expect(resetCoordinator.failures == 2 && resetPublications == 1, "future completion cannot publish")
         resetCoordinator.stop()
+
+        // Production connectivity callbacks use this same coordinator; no host network changes.
+        var networkClock = date
+        var networkCompletions: [(QuotaData?) -> Void] = []
+        var networkPublished: [QuotaData] = []
+        let networkCoordinator = QuotaRefreshCoordinator(now: { networkClock }, networkAvailable: false,
+            fetch: { networkCompletions.append($0) }, publish: { networkPublished.append($0) })
+        networkCoordinator.start()
+        networkCoordinator.activity(); networkClock = date.addingTimeInterval(1000); networkCoordinator.tick()
+        expect(networkCompletions.isEmpty, "offline startup and activity do not launch CLI")
+        networkCoordinator.connectivityChanged(available: true)
+        expect(networkCompletions.count == 1, "first usable network path starts one fetch")
+        networkCompletions.removeFirst()(nil)
+        networkCoordinator.connectivityChanged(available: true); networkCoordinator.activity(); networkCoordinator.tick()
+        expect(networkCompletions.isEmpty, "duplicate path updates do not bypass failure backoff")
+        networkClock = networkClock.addingTimeInterval(9); networkCoordinator.tick()
+        expect(networkCompletions.isEmpty, "connectivity retry waits for deadline")
+        networkClock = networkClock.addingTimeInterval(1); networkCoordinator.tick()
+        expect(networkCompletions.count == 1, "connectivity retry runs at deadline")
+        let beforeLoss = QuotaFetcher.parse(payload(at: networkClock), fetchedAt: networkClock)!
+        networkCoordinator.connectivityChanged(available: false)
+        networkCoordinator.tick()
+        networkCoordinator.connectivityChanged(available: true)
+        expect(networkCompletions.count == 1, "reconnect does not overlap a still-running fetch")
+        networkCompletions.removeFirst()(beforeLoss)
+        expect(networkPublished.isEmpty && networkCompletions.count == 1,
+               "response spanning loss is discarded and one fresh followup starts")
+        var afterReconnect = beforeLoss; afterReconnect.gemini5hRemaining = 0.19
+        networkCompletions.removeFirst()(afterReconnect)
+        expect(networkPublished == [afterReconnect], "reconnect publishes actual returned quota")
+        networkClock = networkClock.addingTimeInterval(240); networkCoordinator.tick()
+        expect(networkCompletions.count == 1, "online periodic cadence preserved")
+        networkCoordinator.connectivityChanged(available: false)
+        networkCompletions.removeFirst()(QuotaFetcher.parse(payload(at: networkClock), fetchedAt: networkClock))
+        expect(networkPublished.count == 1, "late cached success while offline cannot renew freshness")
+        networkClock = networkClock.addingTimeInterval(700); networkCoordinator.activity(); networkCoordinator.tick()
+        expect(networkCompletions.isEmpty && !networkPublished.last!.isFresh(at: networkClock),
+               "prolonged outage ages last quota and does not poll CLI")
+        networkCoordinator.connectivityChanged(available: true)
+        expect(networkCompletions.count == 1, "recovery after prolonged outage is immediate")
+        networkCompletions.removeFirst()(nil)
+        networkCoordinator.connectivityChanged(available: false)
+        networkCoordinator.connectivityChanged(available: true)
+        expect(networkCompletions.count == 1, "real path transition preempts pending retry")
+        networkCompletions.removeFirst()(QuotaFetcher.parse(payload(at: networkClock), fetchedAt: networkClock))
+        expect(networkPublished.count == 2 && networkCoordinator.failures == 0, "recovery resets failures")
+        networkCoordinator.stop()
+        networkCoordinator.connectivityChanged(available: false)
+        networkCoordinator.connectivityChanged(available: true)
+        networkCoordinator.tick()
+        expect(networkCompletions.isEmpty, "connectivity changes after stop cannot start work")
 
         // Use a fake executable only; never invoke the installed CLI or live services.
         let executable = directory.appendingPathComponent("fake-agy")

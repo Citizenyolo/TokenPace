@@ -13,11 +13,15 @@ final class QuotaRefreshCoordinator {
     private var retryAt: Date?
     private var resetAt: Date?
     private var eventAt: Date?
+    private var networkAvailable: Bool
+    private var networkGeneration = 0
 
     init(now: @escaping () -> Date = Date.init,
+         networkAvailable: Bool = true,
          fetch: @escaping (@escaping (QuotaData?) -> Void) -> Void,
          publish: @escaping (QuotaData) throws -> Void) {
         self.now = now
+        self.networkAvailable = networkAvailable
         self.fetch = fetch
         self.publish = publish
     }
@@ -46,8 +50,21 @@ final class QuotaRefreshCoordinator {
         if eventAt == nil { eventAt = now().addingTimeInterval(3) }
     }
 
+    func connectivityChanged(available: Bool) {
+        guard networkAvailable != available else { return }
+        networkAvailable = available
+        networkGeneration += 1
+        guard available, running else { return }
+        // A real path recovery gets one immediate attempt, not a five-minute wait.
+        // Repeated identical path callbacks do not bypass retry backoff.
+        failures = 0
+        retryAt = nil
+        nextPoll = now()
+        tick()
+    }
+
     func tick() {
-        guard running, !inFlight else { return }
+        guard running, networkAvailable, !inFlight else { return }
         let date = now()
         if let retryAt {
             guard date >= retryAt else { return }
@@ -61,10 +78,19 @@ final class QuotaRefreshCoordinator {
         resetAt = nil
         generation += 1
         let id = generation
+        let networkID = networkGeneration
         fetch { [weak self] data in
             guard let self, self.running, self.generation == id else { return }
             self.inFlight = false
             let completed = self.now()
+            // A response spanning a network loss cannot re-stamp the old quota.
+            // Keep the single-flight slot until that fetch actually completes.
+            guard self.networkAvailable else { return }
+            if self.networkGeneration != networkID {
+                self.nextPoll = completed
+                self.tick()
+                return
+            }
             if let data, data.isFresh(at: completed), (try? self.publish(data)) != nil {
                 self.failures = 0
                 self.retryAt = nil

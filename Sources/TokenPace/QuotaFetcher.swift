@@ -53,6 +53,7 @@ struct QuotaFetcher {
     static func parse(_ data: Data, fetchedAt: Date) -> QuotaData? {
         do {
             let usageResponse = try JSONDecoder().decode(UsageResponse.self, from: data)
+            guard usageResponse.status == "SUCCESS", usageResponse.command.name == "usage" else { return nil }
             
             var result = QuotaData(
                 geminiWeeklyRemaining: 0, geminiWeeklyResetTime: "",
@@ -94,6 +95,7 @@ struct QuotaFetcher {
             
             guard seen == required, result.isValid(at: fetchedAt) else { return nil }
             result.fetchedAt = fetchedAt
+            result.producerRevision = QuotaBuildIdentity.revision
             return result
             
         } catch {

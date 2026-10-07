@@ -1,13 +1,16 @@
 import Foundation
 import AppKit
 import WidgetKit
+import Network
 
 class QuotaObserver: ObservableObject {
     private var cliWatcher: DispatchSourceFileSystemObject?
     private var ideWatcher: DispatchSourceFileSystemObject?
     private var timer: Timer?
     private var terminationObserver: NSObjectProtocol?
-    private lazy var coordinator = QuotaRefreshCoordinator(fetch: { completion in
+    private var networkMonitor: NWPathMonitor?
+    private var monitorGeneration = 0
+    private lazy var coordinator = QuotaRefreshCoordinator(networkAvailable: false, fetch: { completion in
         DispatchQueue.global(qos: .utility).async {
             let data = QuotaFetcher.fetchQuota()
             DispatchQueue.main.async { completion(data) }
@@ -26,7 +29,20 @@ class QuotaObserver: ObservableObject {
 
     func start() {
         guard timer == nil else { return }
+        coordinator.connectivityChanged(available: false)
         setupWatchers()
+        monitorGeneration += 1
+        let id = monitorGeneration
+        let monitor = NWPathMonitor()
+        networkMonitor = monitor
+        monitor.pathUpdateHandler = { [weak self] path in
+            let available = path.status == .satisfied
+            DispatchQueue.main.async {
+                guard let self, self.monitorGeneration == id, self.networkMonitor != nil else { return }
+                self.coordinator.connectivityChanged(available: available)
+            }
+        }
+        monitor.start(queue: DispatchQueue.global(qos: .utility))
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.coordinator.tick()
         }
@@ -38,6 +54,9 @@ class QuotaObserver: ObservableObject {
 
     func stop() {
         coordinator.stop()
+        monitorGeneration += 1
+        networkMonitor?.cancel()
+        networkMonitor = nil
         timer?.invalidate()
         timer = nil
         cliWatcher?.cancel()
@@ -49,6 +68,7 @@ class QuotaObserver: ObservableObject {
     }
 
     deinit {
+        networkMonitor?.cancel()
         timer?.invalidate()
         cliWatcher?.cancel()
         ideWatcher?.cancel()

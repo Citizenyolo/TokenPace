@@ -199,8 +199,16 @@ struct TokenPaceEntryView : View {
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                 }
+                // Embed the revision in the timeline itself, not just the installed bundle.
+                // This makes an old WidgetKit snapshot distinguishable during acceptance.
+                Text("Widget \(QuotaBuildIdentity.revision) · Data \(d.producerRevision ?? "legacy")")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
             } else {
                 Text("Quota unavailable. Waiting for valid update...")
+                Text("Widget \(QuotaBuildIdentity.revision)")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
             }
         }
         .font(.system(size: 14, weight: .regular, design: .monospaced))

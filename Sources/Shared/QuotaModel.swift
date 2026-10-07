@@ -11,6 +11,7 @@ struct QuotaData: Codable, Equatable {
     var claude5hRemaining: Double
     var claude5hResetTime: String
     var fetchedAt: Date? = nil
+    var producerRevision: String? = nil
 
     var buckets: [(Double, String, TimeInterval)] {
         [(geminiWeeklyRemaining, geminiWeeklyResetTime, 7 * 24 * 3600),
@@ -32,6 +33,12 @@ struct QuotaData: Codable, Equatable {
               date.timeIntervalSince(fetchedAt) < QuotaPolicy.staleAfter,
               isValid(at: fetchedAt) else { return false }
         return buckets.allSatisfy { QuotaPolicy.resetDate($0.1).map { $0 > date } ?? false }
+    }
+}
+
+enum QuotaBuildIdentity {
+    static var revision: String {
+        Bundle.main.object(forInfoDictionaryKey: "TokenPaceSourceRevision") as? String ?? "unversioned"
     }
 }
 
@@ -78,10 +85,12 @@ struct QuotaStore {
 
 // Data models corresponding to `agy --output-format json -p "/usage"`
 struct UsageResponse: Codable {
+    let status: String?
     let command: UsageCommand
 }
 
 struct UsageCommand: Codable {
+    let name: String?
     let data: UsageData
 }
 

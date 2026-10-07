@@ -21,7 +21,7 @@ TokenPace is a native, headless macOS widget that monitors your Google Antigravi
 ## Known Issues
 
 - **[ISSUE1 (#2): Quota freshness and recovery after network interruptions (WIP)](https://github.com/Citizenyolo/TokenPace/issues/2)**
-  The local implementation now tracks successful CLI read age and retries failed reads. Installed-build verification, upstream CLI cache semantics and end-to-end offline/recovery acceptance remain outstanding; this is not approved for release.
+  The local implementation tracks successful CLI read age, retries failed reads and refreshes on network recovery. An installed Agy 1.3.1 probe rejected quota reads with its internet access blocked, including after a successful online read. Corrected installed-widget offline/recovery acceptance remains outstanding; this is not approved for release.
 
 ## How it works
 
@@ -59,9 +59,15 @@ deviation = actual_remaining_fraction - ideal_remaining
 | Application Startup | Yes (idempotent, single-flight) | On successful publication |
 | 240 seconds after successful publication | Yes | On successful publication |
 | Failed read or publication | Retry after 10, 20, 40, 80, 160, then 300 seconds indefinitely | Retains last known data; ages into stale |
+| No usable network path | No new CLI invocation | Retains last known data; ages into stale |
+| Usable network path restored | One immediate attempt, without waiting for pending retry | On successful publication |
 | Last successful read + 300 seconds | No | Data stale; no pacing indicator |
 
-The 240-second cadence leaves a 60-second margin before the 300-second stale boundary, including a bounded 30-second CLI invocation. Periodic, debounced activity and reset triggers share one coordinator; none bypass failure backoff or overlap a running read. Shutdown invalidates pending work and late responses. Reads also cap stdout at 1 MiB and require a zero exit status. Widget reload occurs only after atomic `quota.json` publication succeeds. Existing legacy cache files decode but are not considered fresh without `fetchedAt`.
+The 240-second cadence leaves a 60-second margin before the 300-second stale boundary, including a bounded 30-second CLI invocation. Periodic, debounced activity and reset triggers share one coordinator; none bypass failure backoff or overlap a running read. An `NWPathMonitor` pauses new reads when no usable path exists and requests one fresh read on recovery. Identical path notifications cannot bypass backoff. A response that spans a path loss is discarded; the coordinator waits for that invocation to finish before starting its replacement. A usable network path does not guarantee that the upstream service is reachable, so service failures still use backoff. Shutdown invalidates pending work and late responses. Reads also cap stdout at 1 MiB and require a zero exit status plus a `SUCCESS` envelope for the `usage` command. Widget reload occurs only after atomic `quota.json` publication succeeds. Existing legacy cache files decode but are not considered fresh without `fetchedAt`.
+
+### Build identity for runtime acceptance
+
+`install.sh` passes the source commit to both targets through `TOKENPACE_SOURCE_REVISION` (with a `-dirty` suffix for modified or untracked build inputs). The widget footer displays its own revision and the revision of the daemon that published the data. This distinguishes an old WidgetKit snapshot from a corrected build; inspecting only the app on disk is insufficient. Manual builds can pass `TOKENPACE_SOURCE_REVISION=<commit>` to `xcodebuild`. Unstamped builds display `unversioned` and cannot establish source identity.
 
 ### Isolated regression checks
 
@@ -131,7 +137,7 @@ TokenPace respects your privacy and is completely local.
 
 - **Timeline Precision:** Apple's WidgetKit independently controls timeline redraw budgets and scheduling logic. Therefore, widget updates and countdown changes are not guaranteed to occur at exact minute boundaries, and updates may be deferred based on system power or performance conditions.
 - **Path Dependency:** Assumes `agy` is installed at `~/.local/bin/agy`.
-- **Upstream Cache:** A successful CLI response may be cached upstream or inside Agy. `fetchedAt` is the local read completion time, not an upstream observation timestamp. This needs a controlled runtime check before release.
+- **Upstream Cache:** `fetchedAt` is local completion time, not a server-supplied observation timestamp. Agy CLI 1.3.1 failed with an `ERROR` envelope and no quota when outbound internet was denied while localhost remained allowed, both before and after a successful online `/usage` read (2026-10-07). This supports offline detection for that installed version; it does not establish every backend caching condition or future CLI behavior. The macOS network-path guard also prevents offline successful responses from renewing quota freshness.
 - **API Stability:** Relies on the internal JSON structure of `agy /usage`. Changes by Google could break parsing.
 
 ## License
