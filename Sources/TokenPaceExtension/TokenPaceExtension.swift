@@ -127,9 +127,8 @@ struct TokenPaceEntryView : View {
         VStack(alignment: .leading, spacing: 20) {
             if let d = entry.data, d.isValid(at: d.fetchedAt ?? entry.date) {
                 let fresh = d.isFresh(at: entry.date)
-                if !fresh { Text("Data stale — last known quota").foregroundColor(.secondary).bold() }
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("GEMINI MODELS").bold()
+                    Text(fresh ? "GEMINI MODELS" : "GEMINI MODELS · STALE").bold()
                     
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -165,7 +164,7 @@ struct TokenPaceEntryView : View {
                 }
                 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("CLAUDE AND GPT MODELS").bold()
+                    Text(fresh ? "CLAUDE AND GPT MODELS" : "CLAUDE AND GPT MODELS · STALE").bold()
                     
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -199,22 +198,22 @@ struct TokenPaceEntryView : View {
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                 }
-                // Embed the revision in the timeline itself, not just the installed bundle.
-                // This makes an old WidgetKit snapshot distinguishable during acceptance.
-                Text("Widget \(QuotaBuildIdentity.revision) · Data \(d.producerRevision ?? "legacy")")
-                    .font(.system(size: 8))
-                    .foregroundColor(.secondary)
             } else {
                 Text("Quota unavailable. Waiting for valid update...")
-                Text("Widget \(QuotaBuildIdentity.revision)")
-                    .font(.system(size: 8))
-                    .foregroundColor(.secondary)
             }
         }
         .font(.system(size: 14, weight: .regular, design: .monospaced))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding()
         .foregroundColor(.primary)
+        // Keep timeline identity outside the stack so it cannot push quota rows offscreen.
+        .overlay(alignment: .bottomLeading) {
+            Text("Widget \(QuotaBuildIdentity.revision) · Data \(entry.data?.producerRevision ?? "legacy")")
+                .font(.system(size: 7))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 3)
+        }
     }
 }
 
