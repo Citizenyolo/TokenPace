@@ -124,13 +124,13 @@ struct TokenPaceEntryView : View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 12) {
             if let d = entry.data, d.isValid(at: d.fetchedAt ?? entry.date) {
                 let fresh = d.isFresh(at: entry.date)
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(fresh ? "GEMINI MODELS" : "GEMINI MODELS · STALE").bold()
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Five Hour Limit Remaining").bold()
                             Spacer()
@@ -146,7 +146,7 @@ struct TokenPaceEntryView : View {
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Weekly Limit Remaining").bold()
                             Spacer()
@@ -163,10 +163,10 @@ struct TokenPaceEntryView : View {
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(fresh ? "CLAUDE AND GPT MODELS" : "CLAUDE AND GPT MODELS · STALE").bold()
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Five Hour Limit Remaining").bold()
                             Spacer()
@@ -182,7 +182,7 @@ struct TokenPaceEntryView : View {
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Weekly Limit Remaining").bold()
                             Spacer()
@@ -207,7 +207,7 @@ struct TokenPaceEntryView : View {
         .padding()
         .foregroundColor(.primary)
         // Keep timeline identity outside the stack so it cannot push quota rows offscreen.
-        .overlay(alignment: .bottomLeading) {
+        .overlay(alignment: .bottom) {
             Text("Widget \(QuotaBuildIdentity.revision) · Data \(entry.data?.producerRevision ?? "legacy")")
                 .font(.system(size: 7))
                 .foregroundColor(.secondary)
@@ -229,6 +229,7 @@ struct TokenPaceExtension: Widget {
         .configurationDisplayName("TokenPace")
         .description("Displays Agy CLI quota usage.")
         .supportedFamilies([.systemLarge])
+        .contentMarginsDisabled()
     }
 }
 
