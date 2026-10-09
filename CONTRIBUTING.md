@@ -62,6 +62,13 @@ Choose checks relevant to your change and include results in the pull request.
 macOS builds and WidgetKit runtime behavior cannot be validated on Linux;
 shell-only checks do not establish application or widget correctness.
 
+The same checks run automatically on a standard GitHub-hosted macOS 15 runner
+for pull requests targeting `main` and pushes to `main`. See the
+[workflow definition](.github/workflows/macos-ci.yml). Its permissions are
+read-only; it does not need secrets, call the live Agy service, install the app
+or change network connectivity. Results appear in the PR, but are not currently
+a required merge check.
+
 ### Installation and runtime testing
 
 `./install.sh` is an installation operation: it builds and signs the app,
