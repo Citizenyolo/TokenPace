@@ -78,6 +78,8 @@ Reset timestamps are copied from the successful Agy CLI response; TokenPace does
 
 Run `bash test_quota.sh` on macOS with Swift installed. This compiles production parsing, freshness, scheduling, subprocess and atomic file-store code against deterministic fixtures, an injected clock and temporary fake CLI executables; it also typechecks the daemon and widget. It never invokes the installed Agy CLI, accesses live quota files, installs/restarts the app, or changes connectivity. Covered cases include offline aging/recovery to actual fractions, reset/event/poll/retry coordination, publication failure, idempotent startup/shutdown, late responses, malformed/partial payloads and bounded subprocess failures. Run `bash test_install_staging.sh` separately to verify installer staging against temporary fixtures without installing the app.
 
+These checks also run automatically for pull requests targeting `main` and pushes to `main` through the [GitHub Actions macOS workflow](.github/workflows/macos-ci.yml). It uses a standard GitHub-hosted runner, tests fixture data without calling the live Agy service, and currently reports results without blocking merges.
+
 ## Requirements
 
 - macOS 14.0 (Sonoma) or newer. Apple Silicon & Intel supported.
