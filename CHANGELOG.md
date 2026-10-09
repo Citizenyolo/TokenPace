@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
+## [1.1.2] - 2026-10-09
+
+Source release for the accepted quota freshness/recovery fix. Install from source with `./install.sh`; no prebuilt or notarized app is distributed.
+
 ### Changed
 - Replaced `ISO8601DateFormatter` with modern `Date(_:strategy: .iso8601)` parsing strategy.
 
