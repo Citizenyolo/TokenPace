@@ -1,22 +1,80 @@
 import Foundation
+import AppKit
 import WidgetKit
+import Network
 
 class QuotaObserver: ObservableObject {
     private var cliWatcher: DispatchSourceFileSystemObject?
     private var ideWatcher: DispatchSourceFileSystemObject?
-    private var debounceTimer: Timer?
-    private let debounceInterval: TimeInterval = 3.0
-    private var resetTimer: Timer?
-    private var pendingFetchWorkItem: DispatchWorkItem?
-    
-    init() {
-        // Initial fetch
-        fetchAndPublish()
-        
-        // Setup watchers
+    private var timer: Timer?
+    private var terminationObserver: NSObjectProtocol?
+    private var networkMonitor: NWPathMonitor?
+    private var monitorGeneration = 0
+    private lazy var coordinator = QuotaRefreshCoordinator(networkAvailable: false, fetch: { completion in
+        DispatchQueue.global(qos: .utility).async {
+            let data = QuotaFetcher.fetchQuota()
+            DispatchQueue.main.async { completion(data) }
+        }
+    }, publish: { data in
+        guard let bundleID = Bundle.main.bundleIdentifier else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let file = home.appendingPathComponent("Library/Containers/\(bundleID)Extension/Data/Documents/quota.json")
+        try QuotaStore(fileURL: file).write(data)
+        WidgetCenter.shared.reloadAllTimelines()
+    })
+
+    init() { start() }
+
+    func start() {
+        guard timer == nil else { return }
+        coordinator.connectivityChanged(available: false)
         setupWatchers()
+        monitorGeneration += 1
+        let id = monitorGeneration
+        let monitor = NWPathMonitor()
+        networkMonitor = monitor
+        monitor.pathUpdateHandler = { [weak self] path in
+            let available = path.status == .satisfied
+            DispatchQueue.main.async {
+                guard let self, self.monitorGeneration == id, self.networkMonitor != nil else { return }
+                self.coordinator.connectivityChanged(available: available)
+            }
+        }
+        monitor.start(queue: DispatchQueue.global(qos: .utility))
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.coordinator.tick()
+        }
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.stop() }
+        coordinator.start()
     }
-    
+
+    func stop() {
+        coordinator.stop()
+        monitorGeneration += 1
+        networkMonitor?.cancel()
+        networkMonitor = nil
+        timer?.invalidate()
+        timer = nil
+        cliWatcher?.cancel()
+        ideWatcher?.cancel()
+        cliWatcher = nil
+        ideWatcher = nil
+        if let terminationObserver { NotificationCenter.default.removeObserver(terminationObserver) }
+        terminationObserver = nil
+    }
+
+    deinit {
+        networkMonitor?.cancel()
+        timer?.invalidate()
+        cliWatcher?.cancel()
+        ideWatcher?.cancel()
+        if let terminationObserver { NotificationCenter.default.removeObserver(terminationObserver) }
+    }
+
     private func setupWatchers() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let cliURL = home.appendingPathComponent(".gemini/antigravity-cli/conversations")
@@ -34,7 +92,7 @@ class QuotaObserver: ObservableObject {
         
         watcher.setEventHandler { [weak self] in
             DispatchQueue.main.async {
-                self?.handleDatabaseChange()
+                self?.coordinator.activity()
             }
         }
         
@@ -46,114 +104,4 @@ class QuotaObserver: ObservableObject {
         return watcher
     }
     
-    private func handleDatabaseChange() {
-        debounceTimer?.invalidate()
-        debounceTimer = Timer.scheduledTimer(withTimeInterval: debounceInterval, repeats: false) { [weak self] _ in
-            self?.fetchAndPublish()
-        }
-    }
-    
-    private func scheduleNextResetFetch(from data: QuotaData) {
-        
-        let resetStrings = [
-            data.geminiWeeklyResetTime,
-            data.gemini5hResetTime,
-            data.claudeWeeklyResetTime,
-            data.claude5hResetTime
-        ]
-        
-        let currentDate = Date()
-        var nextResetDate: Date? = nil
-        
-        for dateString in resetStrings {
-            if let date = try? Date(dateString, strategy: .iso8601) {
-                if date > currentDate {
-                    if let currentNext = nextResetDate {
-                        if date < currentNext {
-                            nextResetDate = date
-                        }
-                    } else {
-                        nextResetDate = date
-                    }
-                }
-            }
-        }
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.resetTimer?.invalidate()
-            
-            if let nextDate = nextResetDate {
-                // Schedule timer 60 seconds after the next reset
-                let fireDate = nextDate.addingTimeInterval(60)
-                let timeUntilFire = fireDate.timeIntervalSince(Date())
-                
-                if timeUntilFire > 0 {
-                    self?.resetTimer = Timer.scheduledTimer(withTimeInterval: timeUntilFire, repeats: false) { _ in
-                        self?.fetchAndPublish()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func scheduleRetry(retryCount: Int, delay: TimeInterval) {
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.fetchAndPublish(retryCount: retryCount)
-        }
-        pendingFetchWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-    }
-
-    private var currentFetchID: Int = 0
-
-    private func fetchAndPublish(retryCount: Int = 0) {
-        pendingFetchWorkItem?.cancel()
-        pendingFetchWorkItem = nil
-
-        currentFetchID += 1
-        let fetchID = currentFetchID
-
-        let fetchWork = DispatchWorkItem { [weak self] in
-            guard let data = QuotaFetcher.fetchQuota() else {
-                if retryCount < 5 {
-                    let delay = min(pow(2.0, Double(retryCount)) * 10.0, 300.0)
-                    DispatchQueue.main.async {
-                        if self?.currentFetchID == fetchID {
-                            self?.scheduleRetry(retryCount: retryCount + 1, delay: delay)
-                        }
-                    }
-                }
-                return
-            }
-            
-            // Move publication and state check back to the main queue to guarantee atomicity
-            // with respect to currentFetchID increments, avoiding race conditions post-check.
-            DispatchQueue.main.async {
-                guard self?.currentFetchID == fetchID else { return }
-
-                // Save directly to the Widget's Sandbox Container
-                let fileManager = FileManager.default
-                let homeDir = fileManager.homeDirectoryForCurrentUser
-                guard let bundleId = Bundle.main.bundleIdentifier else { return }
-                let widgetDocsDir = homeDir.appendingPathComponent("Library/Containers/\(bundleId)Extension/Data/Documents")
-
-                do {
-                    try fileManager.createDirectory(at: widgetDocsDir, withIntermediateDirectories: true, attributes: nil)
-                    let fileURL = widgetDocsDir.appendingPathComponent("quota.json")
-                    let encoded = try JSONEncoder().encode(data)
-                    try encoded.write(to: fileURL, options: .atomic)
-                } catch {
-                    print("Failed to write quota.json: \(error)")
-                }
-
-                // Trigger Widget reload
-                WidgetCenter.shared.reloadAllTimelines()
-
-                // Schedule the auto-fetch for the next quota reset
-                self?.scheduleNextResetFetch(from: data)
-            }
-        }
-
-        DispatchQueue.global(qos: .userInitiated).async(execute: fetchWork)
-    }
 }

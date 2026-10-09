@@ -3,11 +3,24 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
+## [1.1.2] - 2026-10-09
+
+Source release for the accepted quota freshness/recovery fix. Install from source with `./install.sh`; no prebuilt or notarized app is distributed.
+
 ### Changed
 - Replaced `ISO8601DateFormatter` with modern `Date(_:strategy: .iso8601)` parsing strategy.
 
-### Known Issues
-- **WIP:** [ISSUE1 (#2) Quota freshness and recovery after network interruptions](https://github.com/Citizenyolo/TokenPace/issues/2) remains open.
+### Fixed
+- **Quota freshness and recovery ([#2](https://github.com/Citizenyolo/TokenPace/issues/2)):** Track successful local read age; mark snapshots stale after 300 seconds or an expired reset and hide stale pacing. Reject malformed, partial, out-of-range and implausible-reset responses without fabricating availability.
+- **Refresh coordination:** Share one in-flight read across startup, activity, 240-second polling, reset and retry triggers. Bound CLI reads to 30 seconds and 1 MiB stdout; retry with capped exponential backoff and publish snapshots atomically.
+- **Connectivity recovery:** Pause new reads without a usable network path, discard responses spanning a path loss and request a fresh read on recovery. Prevent identical path notifications and activity events from bypassing backoff.
+- **Widget layout:** Fit all four quota rows within the desktop widget frame and place build diagnostics outside the quota layout.
+
+### Added
+- Source revision stamping for the daemon and widget, with visible Widget/Data revisions for runtime verification.
+- 86 isolated production-code regression checks, daemon/widget typechecks and an installer-staging check.
+- [Runtime acceptance evidence and repeatable offline/reconnection protocol](docs/validation/issue-2.md), accepted on 2026-10-09 for installed build `c8691cbf4168`. Upstream cache freshness and exact reset-window semantics remain documented limitations.
 
 ## [1.1.1] - 2026-10-03
 ### Fixed

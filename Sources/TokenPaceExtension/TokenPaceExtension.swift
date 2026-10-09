@@ -12,48 +12,20 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = placeholder(in: context)
+        let fileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents/quota.json")
+        let entry = context.isPreview ? placeholder(in: context)
+            : SimpleEntry(date: Date(), data: QuotaStore(fileURL: fileURL).read())
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        var data: QuotaData? = nil
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        let fileURL = homeDir.appendingPathComponent("Documents/quota.json")
-        
-        // Atomically read data using a single FileHandle snapshot
-        if let handle = try? FileHandle(forReadingFrom: fileURL) {
-            if let saved = try? handle.readToEnd() {
-                data = try? JSONDecoder().decode(QuotaData.self, from: saved)
-            }
-            try? handle.close()
+        let fileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Documents/quota.json")
+        let data = QuotaStore(fileURL: fileURL).read()
+        let entries = QuotaPolicy.timelineDates(for: data, now: Date()).map {
+            SimpleEntry(date: $0, data: data)
         }
-        
-        var entries: [SimpleEntry] = []
-        let currentDate = Date()
-        
-        // M5: Ensure stale transition is actually in the timeline even if reset occurs near end
-        // Generate an entry every minute for 120 minutes.
-        for minuteOffset in 0 ..< 120 {
-            if let entryDate = Calendar.current.date(byAdding: .minute, value: minuteOffset, to: currentDate) {
-                entries.append(SimpleEntry(date: entryDate, data: data))
-            }
-        }
-        
-        // Ensure reset transitions are in the timeline
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        if let d = data {
-            let resetStrings = [d.geminiWeeklyResetTime, d.gemini5hResetTime, d.claudeWeeklyResetTime, d.claude5hResetTime]
-            for rString in resetStrings {
-                if let rDate = formatter.date(from: rString), rDate > currentDate, rDate <= currentDate.addingTimeInterval(120 * 60) {
-                    entries.append(SimpleEntry(date: rDate, data: data))
-                }
-            }
-        }
-
-        // Sort entries by date to be safe
-        entries.sort { $0.date < $1.date }
 
         let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
@@ -66,13 +38,14 @@ struct SimpleEntry: TimelineEntry {
 }
 
 struct PacingIndicator: View {
+    let isFresh: Bool
     let cachedPercentage: Double
     let resetTimeString: String
     let currentDate: Date
     let cycleDurationSeconds: TimeInterval
     
     var indicatorText: (String, Color)? {
-        guard let cycleEnd = try? Date(resetTimeString, strategy: .iso8601) else { return nil }
+        guard isFresh, let cycleEnd = QuotaPolicy.resetDate(resetTimeString) else { return nil }
 
         if currentDate >= cycleEnd {
             return nil // Data is stale; do not imply pacing from expired data
@@ -120,7 +93,7 @@ struct TokenPaceEntryView : View {
     
     // M1 Fix: strictly conservative reset text. Never fabricate availability.
     func formatRefreshText(from dateString: String, currentDate: Date) -> (String, Color) {
-        guard let targetDate = try? Date(dateString, strategy: .iso8601) else {
+        guard let targetDate = QuotaPolicy.resetDate(dateString) else {
             return ("Unknown reset time", .secondary)
         }
         
@@ -151,16 +124,17 @@ struct TokenPaceEntryView : View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            if let d = entry.data {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("GEMINI MODELS").bold()
+        VStack(alignment: .leading, spacing: 12) {
+            if let d = entry.data, d.isValid(at: d.fetchedAt ?? entry.date) {
+                let fresh = d.isFresh(at: entry.date)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(fresh ? "GEMINI MODELS" : "GEMINI MODELS · STALE").bold()
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Five Hour Limit Remaining").bold()
                             Spacer()
-                            PacingIndicator(cachedPercentage: d.gemini5hRemaining, resetTimeString: d.gemini5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                            PacingIndicator(isFresh: fresh, cachedPercentage: d.gemini5hRemaining, resetTimeString: d.gemini5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
                         }
                         HStack(spacing: 0) {
                             Text("  [")
@@ -169,14 +143,14 @@ struct TokenPaceEntryView : View {
                             Text(String(format: "%.0f%%", d.gemini5hRemaining * 100)).foregroundColor(.primary).bold()
                         }
                         let refreshInfo = formatRefreshText(from: d.gemini5hResetTime, currentDate: entry.date)
-                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
+                        Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Weekly Limit Remaining").bold()
                             Spacer()
-                            PacingIndicator(cachedPercentage: d.geminiWeeklyRemaining, resetTimeString: d.geminiWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
+                            PacingIndicator(isFresh: fresh, cachedPercentage: d.geminiWeeklyRemaining, resetTimeString: d.geminiWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
                         }
                         HStack(spacing: 0) {
                             Text("  [")
@@ -185,18 +159,18 @@ struct TokenPaceEntryView : View {
                             Text(String(format: "%.0f%%", d.geminiWeeklyRemaining * 100)).foregroundColor(.primary).bold()
                         }
                         let refreshInfo = formatRefreshText(from: d.geminiWeeklyResetTime, currentDate: entry.date)
-                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
+                        Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("CLAUDE AND GPT MODELS").bold()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(fresh ? "CLAUDE AND GPT MODELS" : "CLAUDE AND GPT MODELS · STALE").bold()
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Five Hour Limit Remaining").bold()
                             Spacer()
-                            PacingIndicator(cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                            PacingIndicator(isFresh: fresh, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
                         }
                         HStack(spacing: 0) {
                             Text("  [")
@@ -205,14 +179,14 @@ struct TokenPaceEntryView : View {
                             Text(String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
                         }
                         let refreshInfo = formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)
-                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
+                        Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("Weekly Limit Remaining").bold()
                             Spacer()
-                            PacingIndicator(cachedPercentage: d.claudeWeeklyRemaining, resetTimeString: d.claudeWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
+                            PacingIndicator(isFresh: fresh, cachedPercentage: d.claudeWeeklyRemaining, resetTimeString: d.claudeWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
                         }
                         HStack(spacing: 0) {
                             Text("  [")
@@ -221,17 +195,25 @@ struct TokenPaceEntryView : View {
                             Text(String(format: "%.0f%%", d.claudeWeeklyRemaining * 100)).foregroundColor(.primary).bold()
                         }
                         let refreshInfo = formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)
-                        Text("  " + refreshInfo.0).foregroundColor(refreshInfo.1)
+                        Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                 }
             } else {
-                Text("No data yet. Waiting for update...")
+                Text("Quota unavailable. Waiting for valid update...")
             }
         }
         .font(.system(size: 14, weight: .regular, design: .monospaced))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding()
         .foregroundColor(.primary)
+        // Keep timeline identity outside the stack so it cannot push quota rows offscreen.
+        .overlay(alignment: .bottom) {
+            Text("Widget \(QuotaBuildIdentity.revision) · Data \(entry.data?.producerRevision ?? "legacy")")
+                .font(.system(size: 7))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 3)
+        }
     }
 }
 
@@ -247,6 +229,7 @@ struct TokenPaceExtension: Widget {
         .configurationDisplayName("TokenPace")
         .description("Displays Agy CLI quota usage.")
         .supportedFamilies([.systemLarge])
+        .contentMarginsDisabled()
     }
 }
 
