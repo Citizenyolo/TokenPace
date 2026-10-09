@@ -1,0 +1,27 @@
+name: macOS CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Regression and installer checks
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run quota regression tests and app/widget typechecks
+        run: bash test_quota.sh
+
+      - name: Check installer syntax and staging behavior
+        run: |
+          bash -n install.sh
+          bash test_install_staging.sh
