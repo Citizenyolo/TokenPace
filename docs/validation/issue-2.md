@@ -43,6 +43,67 @@ bash test_install_staging.sh
 git diff --check
 ```
 
+## Preserved implementation evidence and lessons
+
+The following details were recovered from local implementation records during the
+2026-10-09 documentation audit. They supplement the acceptance report; they are
+not new test runs.
+
+### Scoped CLI cache probe (2026-10-07)
+
+- Tested Agy CLI version: **1.3.1**; executable SHA-256:
+  `88db8b4d21ece4999fa58e0b54cea77154e47b319ee178d086c446262317f3fa`.
+- The sandbox restriction applied only to the spawned CLI, leaving the Mac's
+  connectivity unchanged. Localhost was allowed because this CLI needs a local
+  bind; outbound internet was denied.
+- An initial probe denying *all* networking failed at the localhost bind. That
+  result was **not** treated as cache evidence. The corrected probes returned an
+  `ERROR` envelope with no quota before and after a successful online read.
+- The online response had `SUCCESS`, the `usage` command and all four real bucket
+  IDs. The warmed offline response failed during the eligibility/loadCodeAssist
+  request. Both recorded calls reported zero model turns and zero generation/cache
+  tokens; this is an observation from their usage counters, not a general pricing guarantee.
+- The [sanitized evidence record](cli-cache-probe-2026-10-07.json) preserves the
+  successful online and warmed-offline summaries without keys or conversation data.
+  It does not contain a separate pre-online probe response; that observation is
+  preserved in the implementation notes above. This is not a universal cache test.
+
+### Layout regression and its measurement (2026-10-08)
+
+The diagnostic footer initially occupied a row and pushed quota content outside
+the desktop frame. The repair moved build identity into an overlay and kept stale
+labels inside existing headings/reset rows. Vertical stack spacing changed from
+20/10/4 to 12/8/3 points; the 14-point monospaced font was retained. WidgetKit's
+automatic content margins were disabled while the view's own padding remained.
+
+An `NSHostingView` geometry probe measured the quota view with a **344 × 344** frame,
+using synthetic fractions 67%/100% for Gemini and 53%/100% for Claude/GPT, future
+five-hour/weekly resets and a local fetch timestamp. Entries at read time and
+600 seconds later exercised fresh and stale states. After layout, both reported
+fitting size **328 × 338**, compared with a previous fitting height of **362**.
+This was a geometry check without screenshots or live quota, not proof of an
+installed WidgetKit render; the later user runtime acceptance supplied that
+separate observation. Preserve both fresh and stale layout cases when revisiting
+spacing or diagnostics.
+
+### Build registration and signing pitfalls
+
+During staging, Xcode registered the built app even with
+`REGISTER_APP_WITH_LAUNCH_SERVICES=NO`. That flag was not sufficient to keep the
+staging widget out of registration. Only the staging app's path was unregistered;
+subsequent PluginKit/path checks confirmed the installed extension remained.
+A build-only command avoids explicit installation/restart, but must not be assumed
+to prevent all LaunchServices side effects. Distinguish staging and installed
+paths before removing registrations.
+
+The staged bundles were ad-hoc signed extension-first with the repository
+entitlements and passed `codesign --verify --deep --strict`. Finder metadata added
+to a copied bundle caused an initial signature check failure without changed
+program/dylib hashes; removing extended attributes only from that staging/install
+copy allowed signing/verification. The installed Widget/Data revision and program
+identity were checked separately. These are historical validation steps, not a
+claim that current CI builds or verifies a distributable app.
+
 ## Installed runtime acceptance
 
 The user performed an offline/reconnection test on 2026-10-09, then compared live usage and pacing with CodexBar. Evidence came from user-supplied screenshots, file timestamps and reported observations; it was not an automated end-to-end test.
@@ -100,5 +161,5 @@ TokenPace's pacing is the rounded percentage-point difference between actual rem
 ## References
 
 - [Issue #2 and runtime acceptance](https://github.com/Citizenyolo/TokenPace/issues/2)
-- [Refresh behavior and build identity](../../README.md#refresh-behavior)
+- [Refresh behavior and build identity](../architecture.md#refresh-behavior)
 - [Changelog](../../CHANGELOG.md)

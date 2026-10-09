@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+Release entries retain their historical wording. For current behavior and explicit
+corrections to older parsing/observation descriptions, see the
+[architecture audit notes](docs/architecture.md#documentation-audit-corrections).
+
 ## [Unreleased]
 
 ## [1.1.2] - 2026-10-09
