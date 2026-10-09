@@ -31,7 +31,14 @@ trap "exit 129" HUP
 trap "exit 130" INT
 trap "exit 143" TERM
 
-xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$BUILD_DIR" build | grep -v 'note:' | grep -v 'warning:'
+SOURCE_REVISION=$(git -c core.fsmonitor=false rev-parse --short=12 HEAD 2>/dev/null || printf 'unversioned')
+if [ "$SOURCE_REVISION" != "unversioned" ]; then
+    SOURCE_CHANGES=$(git -c core.fsmonitor=false status --porcelain --untracked-files=normal -- \
+        Sources project.yml Info.plist ExtensionInfo.plist Entitlements.entitlements ExtensionEntitlements.entitlements install.sh)
+    if [ -n "$SOURCE_CHANGES" ]; then SOURCE_REVISION="${SOURCE_REVISION}-dirty"; fi
+fi
+# Pass the same source identity to the daemon and widget; visible in the widget timeline.
+xcodebuild -project TokenPace.xcodeproj -scheme TokenPace SYMROOT="$BUILD_DIR" TOKENPACE_SOURCE_REVISION="$SOURCE_REVISION" build | grep -v 'note:' | grep -v 'warning:'
 
 APP_BUNDLE="$BUILD_DIR/Debug/TokenPace.app"
 if [ ! -d "$APP_BUNDLE" ]; then

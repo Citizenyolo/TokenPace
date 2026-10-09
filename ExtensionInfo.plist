@@ -23,5 +23,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>TokenPaceSourceRevision</key>
+	<string>$(TOKENPACE_SOURCE_REVISION)</string>
 </dict>
 </plist>
