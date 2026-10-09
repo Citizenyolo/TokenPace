@@ -12,7 +12,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 TokenPace is a Swift macOS application with a WidgetKit extension. Development
 requires macOS 14 or newer, Xcode and XcodeGen. See [README.md](README.md) for
-installation requirements and runtime behavior.
+the overview, [installation guide](docs/installation.md) for setup, and
+[architecture guide](docs/architecture.md) for runtime behavior and design rationale.
 
 ### Repository layout
 
@@ -21,6 +22,8 @@ installation requirements and runtime behavior.
 - `Sources/Shared`: quota model, validation, freshness policy and local file storage.
 - `project.yml`: XcodeGen configuration for both targets; generate the Xcode project from this file.
 - `Tests/QuotaRegression.swift`: isolated production-code regression checks.
+- `docs/architecture.md`: data contract, refresh/pacing policy, rationale and upstream limits.
+- `docs/installation.md`: full install/signing/LaunchAgent sequence and uninstall.
 - `docs/validation/issue-2.md`: installed runtime acceptance evidence and repeatable network test protocol.
 
 ### Build without installing
@@ -35,7 +38,11 @@ xcodebuild -project TokenPace.xcodeproj -scheme TokenPace \
   build
 ```
 
-This builds the app and extension without installing or launching them. The
+This builds the app and extension without explicitly installing or launching them.
+Xcode may still register a built bundle with LaunchServices: during implementation,
+`REGISTER_APP_WITH_LAUNCH_SERVICES=NO` did not prevent staging registration.
+See the [recorded registration pitfall](docs/validation/issue-2.md#build-registration-and-signing-pitfalls)
+before assuming a build leaves the widget gallery untouched. The
 project uses ad-hoc signing for local development. Keep target settings in
 `project.yml`, rather than only editing the generated Xcode project.
 The source revision is displayed in the widget footer after installation;
