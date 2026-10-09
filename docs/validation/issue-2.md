@@ -4,8 +4,8 @@
 
 **Installed code tested:** `c8691cbf4168709fad43be927decdb4da3761502`.
 The widget footer reported matching Widget/Data revision `c8691cbf4168`.
-The documentation commit following that revision does not change production code or build inputs.
-Acceptance applies to this tested installation and is not a packaged release or a claim about every upstream configuration.
+Documentation commits following that revision do not change production code or build inputs.
+Acceptance applies to this tested installation, not every upstream configuration. The fix is distributed in the v1.1.2 source release; no prebuilt or notarized app is included.
 
 ## Problem and resulting behavior
 

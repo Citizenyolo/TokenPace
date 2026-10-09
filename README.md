@@ -20,7 +20,7 @@ TokenPace is a native, headless macOS widget that monitors your Google Antigravi
 
 ## Validation status
 
-[Issue #2: quota freshness and recovery after network interruptions](https://github.com/Citizenyolo/TokenPace/issues/2) was accepted and closed on **2026-10-09** after the installed build `c8691cbf4168` passed an offline/reconnection test and usage/pacing comparison with CodexBar. The automated suite passes 86 regression checks plus daemon/widget typechecks. See the [validation report and repeatable test protocol](docs/validation/issue-2.md) for evidence, acceptance criteria and remaining limitations. This records acceptance of the tested installation; it is not a new packaged release.
+[Issue #2: quota freshness and recovery after network interruptions](https://github.com/Citizenyolo/TokenPace/issues/2) was accepted and closed on **2026-10-09** after the installed build `c8691cbf4168` passed an offline/reconnection test and usage/pacing comparison with CodexBar. The automated suite passes 86 regression checks plus daemon/widget typechecks. See the [validation report and repeatable test protocol](docs/validation/issue-2.md) for evidence, acceptance criteria and remaining limitations. [v1.1.2](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.1.2) distributes this fix as source; no prebuilt or notarized app is included.
 
 ## How it works
 
