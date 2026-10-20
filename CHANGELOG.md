@@ -14,6 +14,8 @@ corrections to older parsing/observation descriptions, see the
   remain available in bundle metadata and the local quota snapshot.
 
 ### Fixed
+- Increment the app/extension build version for the new medium family so macOS can
+  invalidate the old large-only widget descriptor during registration.
 - Accept explicitly disabled five-hour buckets after weekly exhaustion, so one
   exhausted model group cannot freeze all quota updates. Show `N/A` / `Weekly limit
   reached` without fabricating a reset or pacing; retain legacy cache compatibility.

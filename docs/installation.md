@@ -99,6 +99,10 @@ Keep those behaviors when editing installer or project settings; see the
   The technical footer was removed on 2026-10-20. Check snapshot age and WidgetKit
   timeline logs too: an app on disk does not identify the cached pixels macOS is
   displaying. Allow for WidgetKit scheduling before concluding a refresh failed.
+  Adding a supported size also changes the WidgetKit descriptor: increment the
+  host and extension `CURRENT_PROJECT_VERSION` together when shipping such a
+  change, then verify the system's descriptor lists the new family. A successful
+  timeline refresh alone does not prove the size menu has refreshed.
 - **Network recovery:** use the [repeatable installed test](validation/issue-2.md#repeatable-installed-test-protocol).
   Offline detection and file publication alone do not prove server-side freshness.
 
