@@ -131,16 +131,23 @@ struct TokenPaceEntryView : View {
                     Text(fresh ? "GEMINI MODELS" : "GEMINI MODELS · STALE").bold()
                     
                     VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Five Hour Limit Remaining").bold()
-                            Spacer()
-                            PacingIndicator(isFresh: fresh && d.gemini5hDisabled != true, cachedPercentage: d.gemini5hRemaining, resetTimeString: d.gemini5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
-                        }
-                        HStack(spacing: 0) {
-                            Text("  [")
-                            QuotaBar(percentage: d.gemini5hRemaining).opacity(d.gemini5hDisabled == true ? 0.4 : 1)
-                            Text("] ")
-                            Text(d.gemini5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.gemini5hRemaining * 100)).foregroundColor(.primary).bold()
+                        Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
+                            GridRow {
+                                Text("Five Hour Limit Remaining").bold().gridColumnAlignment(.leading)
+                                PercentageColumn {
+                                    PacingIndicator(isFresh: fresh && d.gemini5hDisabled != true, cachedPercentage: d.gemini5hRemaining, resetTimeString: d.gemini5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                                }
+                            }
+                            GridRow {
+                                HStack(spacing: 0) {
+                                    Text("  [")
+                                    QuotaBar(percentage: d.gemini5hRemaining).opacity(d.gemini5hDisabled == true ? 0.4 : 1)
+                                    Text("] ")
+                                }
+                                PercentageColumn {
+                                    Text(d.gemini5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.gemini5hRemaining * 100)).foregroundColor(.primary).bold()
+                                }
+                            }
                         }
                         let refreshInfo = d.gemini5hDisabled == true
                             ? ("Weekly limit reached", Color.red)
@@ -149,16 +156,23 @@ struct TokenPaceEntryView : View {
                     }
                     
                     VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Weekly Limit Remaining").bold()
-                            Spacer()
-                            PacingIndicator(isFresh: fresh, cachedPercentage: d.geminiWeeklyRemaining, resetTimeString: d.geminiWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
-                        }
-                        HStack(spacing: 0) {
-                            Text("  [")
-                            QuotaBar(percentage: d.geminiWeeklyRemaining)
-                            Text("] ")
-                            Text(String(format: "%.0f%%", d.geminiWeeklyRemaining * 100)).foregroundColor(.primary).bold()
+                        Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
+                            GridRow {
+                                Text("Weekly Limit Remaining").bold().gridColumnAlignment(.leading)
+                                PercentageColumn {
+                                    PacingIndicator(isFresh: fresh, cachedPercentage: d.geminiWeeklyRemaining, resetTimeString: d.geminiWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
+                                }
+                            }
+                            GridRow {
+                                HStack(spacing: 0) {
+                                    Text("  [")
+                                    QuotaBar(percentage: d.geminiWeeklyRemaining)
+                                    Text("] ")
+                                }
+                                PercentageColumn {
+                                    Text(String(format: "%.0f%%", d.geminiWeeklyRemaining * 100)).foregroundColor(.primary).bold()
+                                }
+                            }
                         }
                         let refreshInfo = formatRefreshText(from: d.geminiWeeklyResetTime, currentDate: entry.date)
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
@@ -169,16 +183,23 @@ struct TokenPaceEntryView : View {
                     Text(fresh ? "CLAUDE AND GPT MODELS" : "CLAUDE AND GPT MODELS · STALE").bold()
                     
                     VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Five Hour Limit Remaining").bold()
-                            Spacer()
-                            PacingIndicator(isFresh: fresh && d.claude5hDisabled != true, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
-                        }
-                        HStack(spacing: 0) {
-                            Text("  [")
-                            QuotaBar(percentage: d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
-                            Text("] ")
-                            Text(d.claude5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
+                        Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
+                            GridRow {
+                                Text("Five Hour Limit Remaining").bold().gridColumnAlignment(.leading)
+                                PercentageColumn {
+                                    PacingIndicator(isFresh: fresh && d.claude5hDisabled != true, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                                }
+                            }
+                            GridRow {
+                                HStack(spacing: 0) {
+                                    Text("  [")
+                                    QuotaBar(percentage: d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
+                                    Text("] ")
+                                }
+                                PercentageColumn {
+                                    Text(d.claude5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
+                                }
+                            }
                         }
                         let refreshInfo = d.claude5hDisabled == true
                             ? ("Weekly limit reached", Color.red)
@@ -187,16 +208,23 @@ struct TokenPaceEntryView : View {
                     }
                     
                     VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Weekly Limit Remaining").bold()
-                            Spacer()
-                            PacingIndicator(isFresh: fresh, cachedPercentage: d.claudeWeeklyRemaining, resetTimeString: d.claudeWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
-                        }
-                        HStack(spacing: 0) {
-                            Text("  [")
-                            QuotaBar(percentage: d.claudeWeeklyRemaining)
-                            Text("] ")
-                            Text(String(format: "%.0f%%", d.claudeWeeklyRemaining * 100)).foregroundColor(.primary).bold()
+                        Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
+                            GridRow {
+                                Text("Weekly Limit Remaining").bold().gridColumnAlignment(.leading)
+                                PercentageColumn {
+                                    PacingIndicator(isFresh: fresh, cachedPercentage: d.claudeWeeklyRemaining, resetTimeString: d.claudeWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
+                                }
+                            }
+                            GridRow {
+                                HStack(spacing: 0) {
+                                    Text("  [")
+                                    QuotaBar(percentage: d.claudeWeeklyRemaining)
+                                    Text("] ")
+                                }
+                                PercentageColumn {
+                                    Text(String(format: "%.0f%%", d.claudeWeeklyRemaining * 100)).foregroundColor(.primary).bold()
+                                }
+                            }
                         }
                         let refreshInfo = formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
@@ -210,14 +238,7 @@ struct TokenPaceEntryView : View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding()
         .foregroundColor(.primary)
-        // Keep timeline identity outside the stack so it cannot push quota rows offscreen.
-        .overlay(alignment: .bottom) {
-            Text("Widget \(QuotaBuildIdentity.revision) · Data \(entry.data?.producerRevision ?? "legacy")")
-                .font(.system(size: 7))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 3)
-        }
+
     }
 }
 
@@ -234,6 +255,18 @@ struct TokenPaceExtension: Widget {
         .description("Displays Agy CLI quota usage.")
         .supportedFamilies([.systemLarge])
         .contentMarginsDisabled()
+    }
+}
+
+// One monospaced column for both metrics: their percent signs share the same x position.
+private struct PercentageColumn<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Text("-100%")
+            .hidden()
+            .accessibilityHidden(true)
+            .overlay(alignment: .trailing) { content }
     }
 }
 

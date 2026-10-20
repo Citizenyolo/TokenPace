@@ -92,9 +92,11 @@ Keep those behaviors when editing installer or project settings; see the
   or conversation data in public diagnostics.
 - **Daemon state:** `launchctl print "gui/$(id -u)/io.github.citizenyolo.TokenPaceDaemon"`
   inspects the installed service without restarting it.
-- **Old or mismatched widget:** compare the visible **Widget** and **Data** revisions.
-  An app on disk does not identify the cached timeline macOS is displaying.
-  Allow for WidgetKit scheduling before concluding a build/refresh failed.
+- **Old or mismatched widget:** compare `TokenPaceSourceRevision` in the installed
+  app and extension Info.plist with `producerRevision` in the widget's `quota.json`.
+  The technical footer was removed on 2026-10-20. Check snapshot age and WidgetKit
+  timeline logs too: an app on disk does not identify the cached pixels macOS is
+  displaying. Allow for WidgetKit scheduling before concluding a refresh failed.
 - **Network recovery:** use the [repeatable installed test](validation/issue-2.md#repeatable-installed-test-protocol).
   Offline detection and file publication alone do not prove server-side freshness.
 

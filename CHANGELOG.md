@@ -8,6 +8,11 @@ corrections to older parsing/observation descriptions, see the
 
 ## [Unreleased]
 
+### Changed
+- Align pacing percentages directly above usage percentages in a shared trailing
+  column, and remove the technical build footer from the widget. Build identities
+  remain available in bundle metadata and the local quota snapshot.
+
 ### Fixed
 - Accept explicitly disabled five-hour buckets after weekly exhaustion, so one
   exhausted model group cannot freeze all quota updates. Show `N/A` / `Weekly limit

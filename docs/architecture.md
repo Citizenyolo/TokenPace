@@ -216,14 +216,20 @@ The widget currently supports the large family; system colors adapt to appearanc
 untracked build input adds `-dirty`; checked inputs are `Sources`, `project.yml`,
 both plists, both entitlements files and `install.sh`. Documentation-only changes
 do not add that suffix. Manual builds can pass `TOKENPACE_SOURCE_REVISION=<commit>`
-to `xcodebuild`; unstamped builds display `unversioned`.
+to `xcodebuild`; unstamped builds store `unversioned`.
 
-The footer reports **Widget** (extension revision) and **Data** (publishing daemon
-revision; `legacy` when absent). It is outside the quota stack so diagnostics do
-not push quota rows offscreen. Inspecting the installed app alone is insufficient:
-macOS may still display an old WidgetKit snapshot. Compare both visible identities
-when accepting runtime behavior, then check age and values. Revision strings are
-diagnostics supplied by the build, not cryptographic integrity verification.
+As of 2026-10-20 the production widget has no technical footer. Both installed
+bundles retain `TokenPaceSourceRevision` in their Info.plist; the snapshot retains
+`producerRevision`. Use these identities, snapshot age and WidgetKit timeline logs
+for diagnostics. They cannot by themselves prove which pixels macOS is displaying;
+allow for WidgetKit scheduling. The older visible-footer evidence in the dated
+validation report remains historical. Revision strings are build diagnostics,
+not cryptographic integrity verification.
+
+Pacing and usage values share fixed-width, trailing-aligned percentage columns.
+The percent signs therefore line up vertically across both rows and all four
+buckets, including one-, two- and three-digit values. Disabled buckets retain
+`N/A` in the same value column.
 
 ## Reset countdown interpretation and upstream limits
 
