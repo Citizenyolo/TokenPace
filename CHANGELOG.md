@@ -19,6 +19,8 @@ corrections to older parsing/observation descriptions, see the
   reached` without fabricating a reset or pacing; retain legacy cache compatibility.
 
 ### Added
+- Medium widget size displaying the same Gemini quota block as large; large retains
+  both model groups. Size selection does not require subscription/date detection.
 - Regression coverage for the real exhausted-weekly CLI response, both model groups,
   strict invalid-state rejection, cache roundtrips and recovery to active quotas.
 - Privacy-safe unified-log reasons for CLI and quota-response rejection.

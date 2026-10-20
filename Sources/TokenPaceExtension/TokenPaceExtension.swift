@@ -89,6 +89,7 @@ struct PacingIndicator: View {
 }
 
 struct TokenPaceEntryView : View {
+    @Environment(\.widgetFamily) private var family
     var entry: Provider.Entry
     
     // M1 Fix: strictly conservative reset text. Never fabricate availability.
@@ -179,55 +180,57 @@ struct TokenPaceEntryView : View {
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(fresh ? "CLAUDE AND GPT MODELS" : "CLAUDE AND GPT MODELS · STALE").bold()
-                    
-                    VStack(alignment: .leading, spacing: 3) {
-                        Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
-                            GridRow {
-                                Text("Five Hour Limit Remaining").bold().gridColumnAlignment(.leading)
-                                PercentageColumn {
-                                    PacingIndicator(isFresh: fresh && d.claude5hDisabled != true, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                if family != .systemMedium {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(fresh ? "CLAUDE AND GPT MODELS" : "CLAUDE AND GPT MODELS · STALE").bold()
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
+                                GridRow {
+                                    Text("Five Hour Limit Remaining").bold().gridColumnAlignment(.leading)
+                                    PercentageColumn {
+                                        PacingIndicator(isFresh: fresh && d.claude5hDisabled != true, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                                    }
+                                }
+                                GridRow {
+                                    HStack(spacing: 0) {
+                                        Text("  [")
+                                        QuotaBar(percentage: d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
+                                        Text("] ")
+                                    }
+                                    PercentageColumn {
+                                        Text(d.claude5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
+                                    }
                                 }
                             }
-                            GridRow {
-                                HStack(spacing: 0) {
-                                    Text("  [")
-                                    QuotaBar(percentage: d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
-                                    Text("] ")
-                                }
-                                PercentageColumn {
-                                    Text(d.claude5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
-                                }
-                            }
+                            let refreshInfo = d.claude5hDisabled == true
+                                ? ("Weekly limit reached", Color.red)
+                                : formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)
+                            Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                         }
-                        let refreshInfo = d.claude5hDisabled == true
-                            ? ("Weekly limit reached", Color.red)
-                            : formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)
-                        Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 3) {
-                        Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
-                            GridRow {
-                                Text("Weekly Limit Remaining").bold().gridColumnAlignment(.leading)
-                                PercentageColumn {
-                                    PacingIndicator(isFresh: fresh, cachedPercentage: d.claudeWeeklyRemaining, resetTimeString: d.claudeWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {
+                                GridRow {
+                                    Text("Weekly Limit Remaining").bold().gridColumnAlignment(.leading)
+                                    PercentageColumn {
+                                        PacingIndicator(isFresh: fresh, cachedPercentage: d.claudeWeeklyRemaining, resetTimeString: d.claudeWeeklyResetTime, currentDate: entry.date, cycleDurationSeconds: 7 * 24 * 3600)
+                                    }
+                                }
+                                GridRow {
+                                    HStack(spacing: 0) {
+                                        Text("  [")
+                                        QuotaBar(percentage: d.claudeWeeklyRemaining)
+                                        Text("] ")
+                                    }
+                                    PercentageColumn {
+                                        Text(String(format: "%.0f%%", d.claudeWeeklyRemaining * 100)).foregroundColor(.primary).bold()
+                                    }
                                 }
                             }
-                            GridRow {
-                                HStack(spacing: 0) {
-                                    Text("  [")
-                                    QuotaBar(percentage: d.claudeWeeklyRemaining)
-                                    Text("] ")
-                                }
-                                PercentageColumn {
-                                    Text(String(format: "%.0f%%", d.claudeWeeklyRemaining * 100)).foregroundColor(.primary).bold()
-                                }
-                            }
+                            let refreshInfo = formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)
+                            Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                         }
-                        let refreshInfo = formatRefreshText(from: d.claudeWeeklyResetTime, currentDate: entry.date)
-                        Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                 }
             } else {
@@ -236,7 +239,8 @@ struct TokenPaceEntryView : View {
         }
         .font(.system(size: 14, weight: .regular, design: .monospaced))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, family == .systemMedium ? 8 : 16)
         .foregroundColor(.primary)
 
     }
@@ -252,8 +256,8 @@ struct TokenPaceExtension: Widget {
                 .containerBackground(Color(NSColor.windowBackgroundColor), for: .widget)
         }
         .configurationDisplayName("TokenPace")
-        .description("Displays Agy CLI quota usage.")
-        .supportedFamilies([.systemLarge])
+        .description("Gemini quotas in medium; Gemini, Claude and GPT quotas in large.")
+        .supportedFamilies([.systemMedium, .systemLarge])
         .contentMarginsDisabled()
     }
 }

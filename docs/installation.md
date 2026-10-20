@@ -38,7 +38,9 @@ A Git checkout lets the installer record its revision in the widget. Builds from
 an extracted archive without Git metadata may display `unversioned`.
 
 Add **TokenPace** from the desktop or Notification Center widget gallery. The
-current extension provides a large widget. Its daemon starts at login through a
+current extension provides a medium Gemini-only widget and a large widget with
+both model groups. Choose the size in the macOS widget gallery or the existing
+widget's size menu. Its daemon starts at login through a
 per-user LaunchAgent; the main app has no visible Dock/menu bar controls.
 
 Running the installer updates **the local installation**, replaces the existing

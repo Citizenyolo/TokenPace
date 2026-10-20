@@ -210,7 +210,13 @@ deduplicates/sorts them and uses `.atEnd` for the next timeline. This updates
 countdown/pacing without a quota read each minute. macOS independently controls
 WidgetKit budgets and scheduling, so redraws can be deferred by power/performance
 conditions. An exact transition in the timeline is not a guaranteed display deadline.
-The widget currently supports the large family; system colors adapt to appearance.
+The widget supports medium (Gemini only) and large (Gemini plus Claude/GPT).
+Both sizes render the same Gemini view, including its typography, bars, reset
+text, stale state and aligned pacing/usage percentages. Medium uses 8-point
+vertical outer padding instead of 16 so both Gemini rows fit the shorter frame;
+horizontal padding stays 16. The size is a display choice, not subscription
+or date detection. Fetching, validation and polling are shared across sizes.
+System colors adapt to appearance.
 
 `install.sh` stamps both targets using `TOKENPACE_SOURCE_REVISION`. A modified or
 untracked build input adds `-dirty`; checked inputs are `Sources`, `project.yml`,
