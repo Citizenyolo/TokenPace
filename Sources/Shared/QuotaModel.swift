@@ -12,16 +12,24 @@ struct QuotaData: Codable, Equatable {
     var claude5hResetTime: String
     var fetchedAt: Date? = nil
     var producerRevision: String? = nil
+    // Optional for backward-compatible decoding of existing local snapshots.
+    var gemini5hDisabled: Bool? = nil
+    var claude5hDisabled: Bool? = nil
 
     var buckets: [(Double, String, TimeInterval)] {
-        [(geminiWeeklyRemaining, geminiWeeklyResetTime, 7 * 24 * 3600),
-         (gemini5hRemaining, gemini5hResetTime, 5 * 3600),
-         (claudeWeeklyRemaining, claudeWeeklyResetTime, 7 * 24 * 3600),
-         (claude5hRemaining, claude5hResetTime, 5 * 3600)]
+        var active = [(geminiWeeklyRemaining, geminiWeeklyResetTime, TimeInterval(7 * 24 * 3600)),
+                      (claudeWeeklyRemaining, claudeWeeklyResetTime, TimeInterval(7 * 24 * 3600))]
+        if gemini5hDisabled != true { active.append((gemini5hRemaining, gemini5hResetTime, 5 * 3600)) }
+        if claude5hDisabled != true { active.append((claude5hRemaining, claude5hResetTime, 5 * 3600)) }
+        return active
     }
 
     func isValid(at date: Date) -> Bool {
-        buckets.allSatisfy { fraction, reset, duration in
+        // A disabled five-hour bucket is legitimate only when its weekly limit is exhausted.
+        // Its reset is not applicable; never fabricate a five-hour deadline.
+        guard gemini5hDisabled != true || (gemini5hRemaining == 0 && geminiWeeklyRemaining == 0),
+              claude5hDisabled != true || (claude5hRemaining == 0 && claudeWeeklyRemaining == 0) else { return false }
+        return buckets.allSatisfy { fraction, reset, duration in
             guard fraction.isFinite, (0...1).contains(fraction),
                   let end = QuotaPolicy.resetDate(reset) else { return false }
             return end > date && end.timeIntervalSince(date) <= duration + 60
@@ -107,4 +115,5 @@ struct UsageBucket: Codable {
     let id: String
     let remaining_fraction: Double?
     let reset_time: String?
+    let disabled: Bool?
 }

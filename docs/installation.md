@@ -31,15 +31,20 @@ cd TokenPace
 ./install.sh
 ```
 
-This clones current `main`. For the tagged source release, select `v1.1.2` before
-installing (`git checkout v1.1.2`). For an existing checkout, choose the source
+This clones current `main`. For the tagged source release, select `v1.2.0` before
+installing (`git checkout v1.2.0`). For an existing checkout, choose the source
 revision you want and run `./install.sh` there; cloning again is unnecessary.
 A Git checkout lets the installer record its revision in the widget. Builds from
 an extracted archive without Git metadata may display `unversioned`.
 
 Add **TokenPace** from the desktop or Notification Center widget gallery. The
-current extension provides a large widget. Its daemon starts at login through a
+current extension provides a medium Gemini (Antigravity)-only widget and a large widget with
+both model groups. Choose the size in the macOS widget gallery or the existing
+widget's size menu. Its daemon starts at login through a
 per-user LaunchAgent; the main app has no visible Dock/menu bar controls.
+
+`Gemini Models (Antigravity)` is the agentic Gemini quota reported by the Agy CLI. It is
+separate from, and does not display, the Gemini chat quota of Google AI Pro.
 
 Running the installer updates **the local installation**, replaces the existing
 app and restarts its processes. It is not a build-only check. To inspect the build
@@ -92,9 +97,15 @@ Keep those behaviors when editing installer or project settings; see the
   or conversation data in public diagnostics.
 - **Daemon state:** `launchctl print "gui/$(id -u)/io.github.citizenyolo.TokenPaceDaemon"`
   inspects the installed service without restarting it.
-- **Old or mismatched widget:** compare the visible **Widget** and **Data** revisions.
-  An app on disk does not identify the cached timeline macOS is displaying.
-  Allow for WidgetKit scheduling before concluding a build/refresh failed.
+- **Old or mismatched widget:** compare `TokenPaceSourceRevision` in the installed
+  app and extension Info.plist with `producerRevision` in the widget's `quota.json`.
+  The technical footer was removed on 2026-10-20. Check snapshot age and WidgetKit
+  timeline logs too: an app on disk does not identify the cached pixels macOS is
+  displaying. Allow for WidgetKit scheduling before concluding a refresh failed.
+  Adding a supported size also changes the WidgetKit descriptor: increment the
+  host and extension `CURRENT_PROJECT_VERSION` together when shipping such a
+  change, then verify the system's descriptor lists the new family. A successful
+  timeline refresh alone does not prove the size menu has refreshed.
 - **Network recovery:** use the [repeatable installed test](validation/issue-2.md#repeatable-installed-test-protocol).
   Offline detection and file publication alone do not prove server-side freshness.
 

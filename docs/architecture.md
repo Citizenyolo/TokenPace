@@ -1,7 +1,7 @@
 # TokenPace architecture and operational decisions
 
 This is the detailed companion to the [README](../README.md). It documents the
-current implementation and its rationale as audited on **2026-10-09**. Historical
+current implementation and its rationale, updated on **2026-10-20**. Historical
 runtime evidence remains in the [Issue #2 validation report](validation/issue-2.md).
 A source review alone cannot establish upstream freshness or identify the build
 macOS is currently displaying; those require the evidence and procedures below.
@@ -52,7 +52,8 @@ Installation/signing details and the historical entitlement regression are in th
 
 A read is accepted only after zero process exit status and a JSON envelope with
 `status: SUCCESS` and `command.name: usage`. All four recognized buckets must
-appear exactly once under their expected group, with a fraction and reset time:
+appear exactly once under their expected group, with a fraction and, for active
+buckets, a reset time:
 
 | Group name in CLI JSON | Bucket IDs | Duration |
 | --- | --- | --- |
@@ -65,14 +66,43 @@ ISO 8601 with or without fractional seconds. Each reset must be later than the
 read time and no more than its cycle duration plus **60 seconds** away. This is
 an implementation plausibility bound, not a verified backend clock-skew guarantee.
 
+### Weekly exhaustion and disabled five-hour buckets
+
+When a weekly allowance is exhausted, Agy can return its five-hour bucket with
+`disabled: true`, `remaining_fraction: 0`, and no `reset_time`. This is a valid
+not-applicable state, not a failed read. TokenPace accepts it only for a five-hour
+bucket with zero remaining and an exhausted corresponding weekly bucket. Weekly
+buckets must remain active with a valid reset; unmarked/active five-hour buckets
+still require a valid reset, including when their remaining fraction is zero.
+
+The cache preserves optional `gemini5hDisabled` / `claude5hDisabled` fields;
+older caches without those fields decode as active. Disabled reset strings are
+normalized to empty, excluded from freshness/reset-trigger calculations, and never
+replaced with invented deadlines. The widget shows `N/A` and `Weekly limit reached`
+for that five-hour row, without pacing. The real weekly percentage/reset and the
+other group's data continue updating. Snapshot age still expires after 300 seconds.
+Normal upstream responses clear the disabled state automatically.
+
+This case caused the 2026-10-20 STALE incident: a successful CLI 1.4.3 response
+was rejected by the old parser's unconditional reset requirement, leaving both
+groups at their last published values. The regression fixture
+[`weekly-exhausted.json`](../Tests/Fixtures/weekly-exhausted.json) preserves the
+quota-only response. Tests use a fixed observation date so its resets do not expire
+with the wall clock. There is no proof that CLI 1.4.3 introduced this state; it may
+have been an existing edge case not covered by earlier tests.
+
+Refresh rejections now log concise reasons to the macOS unified log under
+subsystem `io.github.citizenyolo.TokenPace`, category `quota`. They do not log
+credentials, full CLI output or conversation content.
+
 A snapshot is fresh only when:
 
 - `fetchedAt` exists and is not in the future;
 - local age is **strictly less than 300 seconds**;
 - all buckets were valid at `fetchedAt`;
-- every reset is still in the future at the display entry's date.
+- every active bucket reset is still in the future at the display entry's date.
 
-The whole snapshot is treated as stale if any reset expires. Last known valid
+The whole snapshot is treated as stale if any active bucket reset expires. Last known valid
 percentages remain visible with stale labels and no pacing. Invalid/undecodable
 cache data shows the unavailable message. Legacy files can decode without
 `fetchedAt` or `producerRevision`, but cannot establish freshness without a valid
@@ -172,6 +202,11 @@ The **3-second** activity delay coalesces bursts, and capped backoff avoids repe
 hammering a failing service. These are current policy choices, not verified
 upstream service requirements or claims of globally optimal values.
 
+The CLI's `Gemini Models` group is presented in the widget as **Gemini Models
+(Antigravity)**. It is the agentic Gemini allowance exposed by Antigravity; it does not
+read, infer or represent the separate Gemini chat allowance of a Google AI Pro
+subscription.
+
 ## Widget timelines and build identity
 
 The provider generates **120 minute entries** from the current time, adds exact
@@ -180,20 +215,32 @@ deduplicates/sorts them and uses `.atEnd` for the next timeline. This updates
 countdown/pacing without a quota read each minute. macOS independently controls
 WidgetKit budgets and scheduling, so redraws can be deferred by power/performance
 conditions. An exact transition in the timeline is not a guaranteed display deadline.
-The widget currently supports the large family; system colors adapt to appearance.
+The widget supports medium (Gemini (Antigravity) only) and large (Gemini (Antigravity) plus Claude/GPT).
+Both sizes render the same Gemini view, including its typography, bars, reset
+text, stale state and aligned pacing/usage percentages. Medium uses 8-point
+vertical outer padding instead of 16 so both Gemini rows fit the shorter frame;
+horizontal padding stays 16. The size is a display choice, not subscription
+or date detection. Fetching, validation and polling are shared across sizes.
+System colors adapt to appearance.
 
 `install.sh` stamps both targets using `TOKENPACE_SOURCE_REVISION`. A modified or
 untracked build input adds `-dirty`; checked inputs are `Sources`, `project.yml`,
 both plists, both entitlements files and `install.sh`. Documentation-only changes
 do not add that suffix. Manual builds can pass `TOKENPACE_SOURCE_REVISION=<commit>`
-to `xcodebuild`; unstamped builds display `unversioned`.
+to `xcodebuild`; unstamped builds store `unversioned`.
 
-The footer reports **Widget** (extension revision) and **Data** (publishing daemon
-revision; `legacy` when absent). It is outside the quota stack so diagnostics do
-not push quota rows offscreen. Inspecting the installed app alone is insufficient:
-macOS may still display an old WidgetKit snapshot. Compare both visible identities
-when accepting runtime behavior, then check age and values. Revision strings are
-diagnostics supplied by the build, not cryptographic integrity verification.
+As of 2026-10-20 the production widget has no technical footer. Both installed
+bundles retain `TokenPaceSourceRevision` in their Info.plist; the snapshot retains
+`producerRevision`. Use these identities, snapshot age and WidgetKit timeline logs
+for diagnostics. They cannot by themselves prove which pixels macOS is displaying;
+allow for WidgetKit scheduling. The older visible-footer evidence in the dated
+validation report remains historical. Revision strings are build diagnostics,
+not cryptographic integrity verification.
+
+Pacing and usage values share fixed-width, trailing-aligned percentage columns.
+The percent signs therefore line up vertically across both rows and all four
+buckets, including one-, two- and three-digit values. Disabled buckets retain
+`N/A` in the same value column.
 
 ## Reset countdown interpretation and upstream limits
 

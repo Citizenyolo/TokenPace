@@ -8,6 +8,29 @@ corrections to older parsing/observation descriptions, see the
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-20
+
+### Changed
+- Rename the widget's Gemini group to `Gemini Models (Antigravity)` to distinguish the
+  agentic Antigravity allowance from the separate Google AI Pro Gemini chat quota.
+- Align pacing percentages directly above usage percentages in a shared trailing
+  column, and remove the technical build footer from the widget. Build identities
+  remain available in bundle metadata and the local quota snapshot.
+
+### Fixed
+- Increment the app/extension build version for the new medium family so macOS can
+  invalidate the old large-only widget descriptor during registration.
+- Accept explicitly disabled five-hour buckets after weekly exhaustion, so one
+  exhausted model group cannot freeze all quota updates. Show `N/A` / `Weekly limit
+  reached` without fabricating a reset or pacing; retain legacy cache compatibility.
+
+### Added
+- Medium widget size displaying the same Gemini quota block as large; large retains
+  both model groups. Size selection does not require subscription/date detection.
+- Regression coverage for the real exhausted-weekly CLI response, both model groups,
+  strict invalid-state rejection, cache roundtrips and recovery to active quotas.
+- Privacy-safe unified-log reasons for CLI and quota-response rejection.
+
 ## [1.1.2] - 2026-10-09
 
 Source release for the accepted quota freshness/recovery fix. Install from source with `./install.sh`; no prebuilt or notarized app is distributed.

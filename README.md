@@ -1,7 +1,7 @@
 # TokenPace
 
 TokenPace is a native macOS widget for Google Antigravity (Agy) quota. It shows
-remaining five-hour and weekly allowances for **Gemini** and **Claude/GPT**, plus
+remaining five-hour and weekly allowances for **Gemini (Antigravity)** and **Claude/GPT**, plus
 whether your usage is ahead of or behind an even allowance over each cycle.
 The background app has no Dock or menu bar icon.
 
@@ -28,7 +28,8 @@ This builds and ad-hoc signs the app and extension, installs to
 `~/Applications/TokenPace.app`, registers the widget and starts a login daemon.
 It replaces an existing TokenPace installation and restarts its processes.
 Then add **TokenPace** from the macOS desktop or Notification Center widget gallery.
-The commands above use current `main`; [v1.1.2](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.1.2)
+Choose **Medium** for Gemini (Antigravity) only, or **Large** for Gemini (Antigravity) and Claude/GPT.
+The commands above use current `main`; [v1.2.0](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.2.0)
 is also available as source. No prebuilt or notarized app is included.
 
 See the [installation guide](docs/installation.md) for Xcode setup, installation
@@ -37,6 +38,9 @@ see [Contributing](CONTRIBUTING.md#build-without-installing).
 
 ## Read the widget
 
+- **Gemini Models (Antigravity)** is the agentic Gemini allowance reported by Google
+  Antigravity (Agy). It does **not** represent the separate Gemini chat allowance
+  included with Google AI Pro.
 - **Remaining quota** and **Resets in** come from Agy's reported fractions and deadlines.
 - **Pacing** compares remaining quota with an even allowance over the cycle:
   green above +2 percentage points, blue within ±2, red below −2, after rounding.
