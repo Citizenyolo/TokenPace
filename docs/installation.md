@@ -31,8 +31,8 @@ cd TokenPace
 ./install.sh
 ```
 
-This clones current `main`. For the tagged source release, select `v1.1.2` before
-installing (`git checkout v1.1.2`). For an existing checkout, choose the source
+This clones current `main`. For the tagged source release, select `v1.2.0` before
+installing (`git checkout v1.2.0`). For an existing checkout, choose the source
 revision you want and run `./install.sh` there; cloning again is unnecessary.
 A Git checkout lets the installer record its revision in the widget. Builds from
 an extracted archive without Git metadata may display `unversioned`.

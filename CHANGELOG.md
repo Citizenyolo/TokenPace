@@ -8,6 +8,8 @@ corrections to older parsing/observation descriptions, see the
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-20
+
 ### Changed
 - Rename the widget's Gemini group to `Gemini Models (Antigravity)` to distinguish the
   agentic Antigravity allowance from the separate Google AI Pro Gemini chat quota.

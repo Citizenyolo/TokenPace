@@ -29,7 +29,7 @@ This builds and ad-hoc signs the app and extension, installs to
 It replaces an existing TokenPace installation and restarts its processes.
 Then add **TokenPace** from the macOS desktop or Notification Center widget gallery.
 Choose **Medium** for Gemini (Antigravity) only, or **Large** for Gemini (Antigravity) and Claude/GPT.
-The commands above use current `main`; [v1.1.2](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.1.2)
+The commands above use current `main`; [v1.2.0](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.2.0)
 is also available as source. No prebuilt or notarized app is included.
 
 See the [installation guide](docs/installation.md) for Xcode setup, installation
