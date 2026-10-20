@@ -134,15 +134,17 @@ struct TokenPaceEntryView : View {
                         HStack {
                             Text("Five Hour Limit Remaining").bold()
                             Spacer()
-                            PacingIndicator(isFresh: fresh, cachedPercentage: d.gemini5hRemaining, resetTimeString: d.gemini5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                            PacingIndicator(isFresh: fresh && d.gemini5hDisabled != true, cachedPercentage: d.gemini5hRemaining, resetTimeString: d.gemini5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
                         }
                         HStack(spacing: 0) {
                             Text("  [")
-                            QuotaBar(percentage: d.gemini5hRemaining)
+                            QuotaBar(percentage: d.gemini5hRemaining).opacity(d.gemini5hDisabled == true ? 0.4 : 1)
                             Text("] ")
-                            Text(String(format: "%.0f%%", d.gemini5hRemaining * 100)).foregroundColor(.primary).bold()
+                            Text(d.gemini5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.gemini5hRemaining * 100)).foregroundColor(.primary).bold()
                         }
-                        let refreshInfo = formatRefreshText(from: d.gemini5hResetTime, currentDate: entry.date)
+                        let refreshInfo = d.gemini5hDisabled == true
+                            ? ("Weekly limit reached", Color.red)
+                            : formatRefreshText(from: d.gemini5hResetTime, currentDate: entry.date)
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                     
@@ -170,15 +172,17 @@ struct TokenPaceEntryView : View {
                         HStack {
                             Text("Five Hour Limit Remaining").bold()
                             Spacer()
-                            PacingIndicator(isFresh: fresh, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
+                            PacingIndicator(isFresh: fresh && d.claude5hDisabled != true, cachedPercentage: d.claude5hRemaining, resetTimeString: d.claude5hResetTime, currentDate: entry.date, cycleDurationSeconds: 5 * 3600)
                         }
                         HStack(spacing: 0) {
                             Text("  [")
-                            QuotaBar(percentage: d.claude5hRemaining)
+                            QuotaBar(percentage: d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
                             Text("] ")
-                            Text(String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
+                            Text(d.claude5hDisabled == true ? "N/A" : String(format: "%.0f%%", d.claude5hRemaining * 100)).foregroundColor(.primary).bold()
                         }
-                        let refreshInfo = formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)
+                        let refreshInfo = d.claude5hDisabled == true
+                            ? ("Weekly limit reached", Color.red)
+                            : formatRefreshText(from: d.claude5hResetTime, currentDate: entry.date)
                         Text(fresh ? "  " + refreshInfo.0 : "  Data stale").foregroundColor(fresh ? refreshInfo.1 : .secondary)
                     }
                     

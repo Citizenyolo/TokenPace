@@ -1,7 +1,7 @@
 # TokenPace architecture and operational decisions
 
 This is the detailed companion to the [README](../README.md). It documents the
-current implementation and its rationale as audited on **2026-10-09**. Historical
+current implementation and its rationale, updated on **2026-10-20**. Historical
 runtime evidence remains in the [Issue #2 validation report](validation/issue-2.md).
 A source review alone cannot establish upstream freshness or identify the build
 macOS is currently displaying; those require the evidence and procedures below.
@@ -52,7 +52,8 @@ Installation/signing details and the historical entitlement regression are in th
 
 A read is accepted only after zero process exit status and a JSON envelope with
 `status: SUCCESS` and `command.name: usage`. All four recognized buckets must
-appear exactly once under their expected group, with a fraction and reset time:
+appear exactly once under their expected group, with a fraction and, for active
+buckets, a reset time:
 
 | Group name in CLI JSON | Bucket IDs | Duration |
 | --- | --- | --- |
@@ -65,14 +66,43 @@ ISO 8601 with or without fractional seconds. Each reset must be later than the
 read time and no more than its cycle duration plus **60 seconds** away. This is
 an implementation plausibility bound, not a verified backend clock-skew guarantee.
 
+### Weekly exhaustion and disabled five-hour buckets
+
+When a weekly allowance is exhausted, Agy can return its five-hour bucket with
+`disabled: true`, `remaining_fraction: 0`, and no `reset_time`. This is a valid
+not-applicable state, not a failed read. TokenPace accepts it only for a five-hour
+bucket with zero remaining and an exhausted corresponding weekly bucket. Weekly
+buckets must remain active with a valid reset; unmarked/active five-hour buckets
+still require a valid reset, including when their remaining fraction is zero.
+
+The cache preserves optional `gemini5hDisabled` / `claude5hDisabled` fields;
+older caches without those fields decode as active. Disabled reset strings are
+normalized to empty, excluded from freshness/reset-trigger calculations, and never
+replaced with invented deadlines. The widget shows `N/A` and `Weekly limit reached`
+for that five-hour row, without pacing. The real weekly percentage/reset and the
+other group's data continue updating. Snapshot age still expires after 300 seconds.
+Normal upstream responses clear the disabled state automatically.
+
+This case caused the 2026-10-20 STALE incident: a successful CLI 1.4.3 response
+was rejected by the old parser's unconditional reset requirement, leaving both
+groups at their last published values. The regression fixture
+[`weekly-exhausted.json`](../Tests/Fixtures/weekly-exhausted.json) preserves the
+quota-only response. Tests use a fixed observation date so its resets do not expire
+with the wall clock. There is no proof that CLI 1.4.3 introduced this state; it may
+have been an existing edge case not covered by earlier tests.
+
+Refresh rejections now log concise reasons to the macOS unified log under
+subsystem `io.github.citizenyolo.TokenPace`, category `quota`. They do not log
+credentials, full CLI output or conversation content.
+
 A snapshot is fresh only when:
 
 - `fetchedAt` exists and is not in the future;
 - local age is **strictly less than 300 seconds**;
 - all buckets were valid at `fetchedAt`;
-- every reset is still in the future at the display entry's date.
+- every active bucket reset is still in the future at the display entry's date.
 
-The whole snapshot is treated as stale if any reset expires. Last known valid
+The whole snapshot is treated as stale if any active bucket reset expires. Last known valid
 percentages remain visible with stale labels and no pacing. Invalid/undecodable
 cache data shows the unavailable message. Legacy files can decode without
 `fetchedAt` or `producerRevision`, but cannot establish freshness without a valid

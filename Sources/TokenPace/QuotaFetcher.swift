@@ -1,7 +1,15 @@
 import Foundation
 import Darwin
+import OSLog
 
 struct QuotaFetcher {
+    private static let logger = Logger(subsystem: "io.github.citizenyolo.TokenPace", category: "quota")
+
+    private static func reject(_ reason: String) -> QuotaData? {
+        logger.error("Quota refresh rejected: \(reason, privacy: .public)")
+        return nil
+    }
+
     static func fetchQuota() -> QuotaData? {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return fetchQuota(executable: home.appendingPathComponent(".local/bin/agy"))
@@ -38,22 +46,21 @@ struct QuotaFetcher {
                     kill(task.processIdentifier, SIGKILL)
                     task.waitUntilExit()
                 }
-                return nil
+                return reject(output.overflow ? "CLI output exceeded limit" : "CLI timeout")
             }
             task.waitUntilExit()
             pipe.fileHandleForReading.readabilityHandler = nil
-            guard task.terminationStatus == 0, !output.overflow else { return nil }
+            guard task.terminationStatus == 0, !output.overflow else { return reject("CLI exited unsuccessfully") }
             return parse(output.data, fetchedAt: Date())
         } catch {
-            print("Failed to run agy: \(error)")
-            return nil
+            return reject("CLI launch failed")
         }
     }
 
     static func parse(_ data: Data, fetchedAt: Date) -> QuotaData? {
         do {
             let usageResponse = try JSONDecoder().decode(UsageResponse.self, from: data)
-            guard usageResponse.status == "SUCCESS", usageResponse.command.name == "usage" else { return nil }
+            guard usageResponse.status == "SUCCESS", usageResponse.command.name == "usage" else { return reject("invalid response envelope") }
             
             var result = QuotaData(
                 geminiWeeklyRemaining: 0, geminiWeeklyResetTime: "",
@@ -68,7 +75,14 @@ struct QuotaFetcher {
                 for bucket in group.buckets where required.contains(bucket.id) {
                     let expectedGroup = bucket.id.hasPrefix("gemini-") ? "Gemini Models" : "Claude and GPT models"
                     guard group.name == expectedGroup, seen.insert(bucket.id).inserted,
-                          bucket.remaining_fraction != nil, bucket.reset_time != nil else { return nil }
+                          bucket.remaining_fraction != nil else { return reject("missing, duplicate or misplaced bucket") }
+                    if bucket.disabled == true {
+                        guard bucket.id.hasSuffix("-5h"), bucket.remaining_fraction == 0 else {
+                            return reject("invalid disabled bucket")
+                        }
+                    } else if bucket.reset_time == nil {
+                        return reject("active bucket is missing reset time")
+                    }
                 }
                 if group.name == "Gemini Models" {
                     for bucket in group.buckets {
@@ -77,7 +91,8 @@ struct QuotaFetcher {
                             result.geminiWeeklyResetTime = bucket.reset_time ?? ""
                         } else if bucket.id == "gemini-5h" {
                             result.gemini5hRemaining = bucket.remaining_fraction ?? 0
-                            result.gemini5hResetTime = bucket.reset_time ?? ""
+                            result.gemini5hDisabled = bucket.disabled
+                            result.gemini5hResetTime = bucket.disabled == true ? "" : bucket.reset_time ?? ""
                         }
                     }
                 } else if group.name == "Claude and GPT models" {
@@ -87,20 +102,20 @@ struct QuotaFetcher {
                             result.claudeWeeklyResetTime = bucket.reset_time ?? ""
                         } else if bucket.id == "3p-5h" {
                             result.claude5hRemaining = bucket.remaining_fraction ?? 0
-                            result.claude5hResetTime = bucket.reset_time ?? ""
+                            result.claude5hDisabled = bucket.disabled
+                            result.claude5hResetTime = bucket.disabled == true ? "" : bucket.reset_time ?? ""
                         }
                     }
                 }
             }
             
-            guard seen == required, result.isValid(at: fetchedAt) else { return nil }
+            guard seen == required, result.isValid(at: fetchedAt) else { return reject("incomplete or implausible quota snapshot") }
             result.fetchedAt = fetchedAt
             result.producerRevision = QuotaBuildIdentity.revision
             return result
             
         } catch {
-            print("Failed to run agy or decode json: \(error)")
-            return nil
+            return reject("JSON decoding failed")
         }
     }
 }

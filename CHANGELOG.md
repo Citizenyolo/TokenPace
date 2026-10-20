@@ -8,6 +8,16 @@ corrections to older parsing/observation descriptions, see the
 
 ## [Unreleased]
 
+### Fixed
+- Accept explicitly disabled five-hour buckets after weekly exhaustion, so one
+  exhausted model group cannot freeze all quota updates. Show `N/A` / `Weekly limit
+  reached` without fabricating a reset or pacing; retain legacy cache compatibility.
+
+### Added
+- Regression coverage for the real exhausted-weekly CLI response, both model groups,
+  strict invalid-state rejection, cache roundtrips and recovery to active quotas.
+- Privacy-safe unified-log reasons for CLI and quota-response rejection.
+
 ## [1.1.2] - 2026-10-09
 
 Source release for the accepted quota freshness/recovery fix. Install from source with `./install.sh`; no prebuilt or notarized app is distributed.

@@ -22,8 +22,93 @@ struct QuotaRegression {
         return try! JSONSerialization.data(withJSONObject: ["status": "SUCCESS", "command": ["name": "usage", "data": ["groups": groups]]])
     }
 
+    static func editBucket(_ bytes: Data, id: String, edit: (inout [String: Any]) -> Void) throws -> Data {
+        var envelope = try JSONSerialization.jsonObject(with: bytes) as! [String: Any]
+        var command = envelope["command"] as! [String: Any]
+        var data = command["data"] as! [String: Any]
+        var groups = data["groups"] as! [[String: Any]]
+        for i in groups.indices {
+            var buckets = groups[i]["buckets"] as! [[String: Any]]
+            for j in buckets.indices where buckets[j]["id"] as? String == id { edit(&buckets[j]) }
+            groups[i]["buckets"] = buckets
+        }
+        data["groups"] = groups; command["data"] = data; envelope["command"] = command
+        return try JSONSerialization.data(withJSONObject: envelope)
+    }
+
+    static func disabledQuotaChecks(at date: Date) throws {
+        // Real CLI 1.4.3 response that stopped the installed widget on 2026-10-20.
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/weekly-exhausted.json")
+        let observedAt = ISO8601DateFormatter().date(from: "2026-10-20T18:05:12Z")!
+        let observed = QuotaFetcher.parse(try Data(contentsOf: fixture), fetchedAt: observedAt)
+        expect(observed?.isFresh(at: observedAt) == true, "real exhausted-weekly response is fresh")
+        expect(observed?.claude5hDisabled == true && observed?.claudeWeeklyRemaining == 0,
+               "real response retains exhausted weekly and disabled five-hour states")
+        expect(observed?.claude5hResetTime == "", "no invented five-hour reset")
+        expect(observed?.gemini5hRemaining == 0.8889215588569641, "healthy group retains actual live value")
+
+        for prefix in ["gemini", "3p"] {
+            let original = payload(at: date)
+            let weeklyZero = try editBucket(original, id: "\(prefix)-weekly") { $0["remaining_fraction"] = 0.0 }
+            let exhausted = try editBucket(weeklyZero, id: "\(prefix)-5h") {
+                $0["remaining_fraction"] = 0.0; $0["disabled"] = true; $0.removeValue(forKey: "reset_time")
+            }
+            let parsed = QuotaFetcher.parse(exhausted, fetchedAt: date)!
+            expect(parsed.isFresh(at: date), "either group may disable its five-hour bucket")
+            expect(parsed.buckets.count == 3, "disabled bucket cannot schedule a fictitious reset")
+            expect(parsed.isFresh(at: date.addingTimeInterval(299)), "disabled bucket does not immediately expire snapshot")
+            expect(!parsed.isFresh(at: date.addingTimeInterval(300)), "disabled snapshot still ages stale")
+            let roundtrip = try JSONDecoder().decode(QuotaData.self, from: JSONEncoder().encode(parsed))
+            expect(roundtrip == parsed && roundtrip.isFresh(at: date), "disabled state survives cache roundtrip")
+            expect(QuotaPolicy.timelineDates(for: parsed, now: date).contains(date.addingTimeInterval(300)),
+                   "disabled snapshot retains exact stale transition")
+            let disabledWithExpiredReset = try editBucket(exhausted, id: "\(prefix)-5h") {
+                $0["reset_time"] = "2001-01-01T00:00:00Z"
+            }
+            expect(QuotaFetcher.parse(disabledWithExpiredReset, fetchedAt: date)?.isFresh(at: date) == true,
+                   "irrelevant disabled reset is ignored")
+            let missingActiveReset = try editBucket(exhausted, id: "\(prefix)-5h") { $0["disabled"] = false }
+            expect(QuotaFetcher.parse(missingActiveReset, fetchedAt: date) == nil,
+                   "active bucket still requires reset")
+            let nonzeroDisabled = try editBucket(exhausted, id: "\(prefix)-5h") { $0["remaining_fraction"] = 0.1 }
+            expect(QuotaFetcher.parse(nonzeroDisabled, fetchedAt: date) == nil, "nonzero disabled bucket rejected")
+            let nonzeroWeekly = try editBucket(exhausted, id: "\(prefix)-weekly") { $0["remaining_fraction"] = 0.1 }
+            expect(QuotaFetcher.parse(nonzeroWeekly, fetchedAt: date) == nil,
+                   "disabled state requires exhausted weekly bucket")
+            let disabledWeekly = try editBucket(exhausted, id: "\(prefix)-weekly") { $0["disabled"] = true }
+            expect(QuotaFetcher.parse(disabledWeekly, fetchedAt: date) == nil, "weekly bucket cannot be disabled")
+            let activeZero = try editBucket(weeklyZero, id: "\(prefix)-5h") { $0["remaining_fraction"] = 0.0 }
+            expect(QuotaFetcher.parse(activeZero, fetchedAt: date)?.isFresh(at: date) == true,
+                   "active zero percent with valid reset remains valid")
+            let badWeeklyReset = try editBucket(exhausted, id: "\(prefix)-weekly") { $0.removeValue(forKey: "reset_time") }
+            expect(QuotaFetcher.parse(badWeeklyReset, fetchedAt: date) == nil, "weekly reset remains mandatory")
+
+            var clock = date
+            var callbacks: [(QuotaData?) -> Void] = []
+            var published: [QuotaData] = []
+            let coordinator = QuotaRefreshCoordinator(now: { clock }, fetch: { callbacks.append($0) },
+                                                      publish: { published.append($0) })
+            coordinator.start(); callbacks.removeFirst()(parsed)
+            expect(published == [parsed] && coordinator.failures == 0, "disabled response publishes without backoff")
+            clock = date.addingTimeInterval(240); coordinator.tick()
+            expect(callbacks.count == 1, "disabled response preserves periodic polling")
+            let recovered = QuotaFetcher.parse(payload(at: clock), fetchedAt: clock)!
+            callbacks.removeFirst()(recovered)
+            expect(published == [parsed, recovered] && recovered.gemini5hDisabled != true && recovered.claude5hDisabled != true,
+                   "normal upstream response clears disabled state")
+            coordinator.stop()
+        }
+        let normal = QuotaFetcher.parse(payload(at: date), fetchedAt: date)!
+        var legacy = try JSONSerialization.jsonObject(with: JSONEncoder().encode(normal)) as! [String: Any]
+        legacy.removeValue(forKey: "gemini5hDisabled"); legacy.removeValue(forKey: "claude5hDisabled")
+        let decoded = try JSONDecoder().decode(QuotaData.self, from: JSONSerialization.data(withJSONObject: legacy))
+        expect(decoded.isFresh(at: date), "old installed caches without disabled fields still decode fresh")
+    }
+
     static func main() throws {
         let date = Date(timeIntervalSince1970: 1_800_000_000)
+        try disabledQuotaChecks(at: date)
         let bytes = payload(at: date)
         let data = QuotaFetcher.parse(bytes, fetchedAt: date)!
         expect(data.gemini5hRemaining == 0.31 && data.claude5hRemaining == 0.13, "actual fractions preserved")
