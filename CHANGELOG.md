@@ -9,6 +9,8 @@ corrections to older parsing/observation descriptions, see the
 ## [Unreleased]
 
 ### Changed
+- Rename the widget's Gemini group to `Gemini Models (Antigravity)` to distinguish the
+  agentic Antigravity allowance from the separate Google AI Pro Gemini chat quota.
 - Align pacing percentages directly above usage percentages in a shared trailing
   column, and remove the technical build footer from the widget. Build identities
   remain available in bundle metadata and the local quota snapshot.

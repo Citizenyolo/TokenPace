@@ -38,10 +38,13 @@ A Git checkout lets the installer record its revision in the widget. Builds from
 an extracted archive without Git metadata may display `unversioned`.
 
 Add **TokenPace** from the desktop or Notification Center widget gallery. The
-current extension provides a medium Gemini-only widget and a large widget with
+current extension provides a medium Gemini (Antigravity)-only widget and a large widget with
 both model groups. Choose the size in the macOS widget gallery or the existing
 widget's size menu. Its daemon starts at login through a
 per-user LaunchAgent; the main app has no visible Dock/menu bar controls.
+
+`Gemini Models (Antigravity)` is the agentic Gemini quota reported by the Agy CLI. It is
+separate from, and does not display, the Gemini chat quota of Google AI Pro.
 
 Running the installer updates **the local installation**, replaces the existing
 app and restarts its processes. It is not a build-only check. To inspect the build

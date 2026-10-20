@@ -129,7 +129,7 @@ struct TokenPaceEntryView : View {
             if let d = entry.data, d.isValid(at: d.fetchedAt ?? entry.date) {
                 let fresh = d.isFresh(at: entry.date)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(fresh ? "GEMINI MODELS" : "GEMINI MODELS · STALE").bold()
+                    Text(fresh ? "GEMINI MODELS (ANTIGRAVITY)" : "GEMINI MODELS (ANTIGRAVITY) · STALE").bold()
                     
                     VStack(alignment: .leading, spacing: 3) {
                         Grid(alignment: .trailing, horizontalSpacing: 0, verticalSpacing: 3) {

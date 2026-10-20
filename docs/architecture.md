@@ -202,6 +202,11 @@ The **3-second** activity delay coalesces bursts, and capped backoff avoids repe
 hammering a failing service. These are current policy choices, not verified
 upstream service requirements or claims of globally optimal values.
 
+The CLI's `Gemini Models` group is presented in the widget as **Gemini Models
+(Antigravity)**. It is the agentic Gemini allowance exposed by Antigravity; it does not
+read, infer or represent the separate Gemini chat allowance of a Google AI Pro
+subscription.
+
 ## Widget timelines and build identity
 
 The provider generates **120 minute entries** from the current time, adds exact
@@ -210,7 +215,7 @@ deduplicates/sorts them and uses `.atEnd` for the next timeline. This updates
 countdown/pacing without a quota read each minute. macOS independently controls
 WidgetKit budgets and scheduling, so redraws can be deferred by power/performance
 conditions. An exact transition in the timeline is not a guaranteed display deadline.
-The widget supports medium (Gemini only) and large (Gemini plus Claude/GPT).
+The widget supports medium (Gemini (Antigravity) only) and large (Gemini (Antigravity) plus Claude/GPT).
 Both sizes render the same Gemini view, including its typography, bars, reset
 text, stale state and aligned pacing/usage percentages. Medium uses 8-point
 vertical outer padding instead of 16 so both Gemini rows fit the shorter frame;
