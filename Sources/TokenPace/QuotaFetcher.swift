@@ -75,9 +75,12 @@ struct QuotaFetcher {
                 for bucket in group.buckets where required.contains(bucket.id) {
                     let expectedGroup = bucket.id.hasPrefix("gemini-") ? "Gemini Models" : "Claude and GPT models"
                     guard group.name == expectedGroup, seen.insert(bucket.id).inserted,
-                          bucket.remaining_fraction != nil else { return reject("missing, duplicate or misplaced bucket") }
+                          let fraction = bucket.remaining_fraction else { return reject("missing, duplicate or misplaced bucket") }
+                    guard fraction.isFinite, (0...1).contains(fraction) else {
+                        return reject("invalid quota fraction")
+                    }
                     if bucket.disabled == true {
-                        guard bucket.id.hasSuffix("-5h"), bucket.remaining_fraction == 0 else {
+                        guard bucket.id.hasSuffix("-5h") else {
                             return reject("invalid disabled bucket")
                         }
                     } else if bucket.reset_time == nil {

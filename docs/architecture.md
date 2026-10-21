@@ -69,19 +69,29 @@ an implementation plausibility bound, not a verified backend clock-skew guarante
 ### Weekly exhaustion and disabled five-hour buckets
 
 When a weekly allowance is exhausted, Agy can return its five-hour bucket with
-`disabled: true`, `remaining_fraction: 0`, and no `reset_time`. This is a valid
-not-applicable state, not a failed read. TokenPace accepts it only for a five-hour
-bucket with zero remaining and an exhausted corresponding weekly bucket. Weekly
+`disabled: true` and no `reset_time`. The reported fraction can be zero, one, or
+another finite value within `[0, 1]`; it does not indicate usable quota while
+disabled. This is a valid not-applicable state, not a failed read. TokenPace accepts
+it only for a five-hour bucket with an exhausted corresponding weekly bucket. Weekly
 buckets must remain active with a valid reset; unmarked/active five-hour buckets
 still require a valid reset, including when their remaining fraction is zero.
 
-The cache preserves optional `gemini5hDisabled` / `claude5hDisabled` fields;
-older caches without those fields decode as active. Disabled reset strings are
+The cache preserves the reported fraction and optional `gemini5hDisabled` /
+`claude5hDisabled` fields; validation checks disabled fractions too.
+Older caches without those fields decode as active. Disabled reset strings are
 normalized to empty, excluded from freshness/reset-trigger calculations, and never
 replaced with invented deadlines. The widget shows `N/A` and `Weekly limit reached`
-for that five-hour row, without pacing. The real weekly percentage/reset and the
-other group's data continue updating. Snapshot age still expires after 300 seconds.
+for that five-hour row, with an empty bar and without pacing. The real weekly
+percentage/reset and the other group's data continue updating. Snapshot age still
+expires after 300 seconds.
 Normal upstream responses clear the disabled state automatically.
+
+On 2026-10-21, the same disabled Claude/GPT bucket reported a fraction of one
+after previously reporting zero. The v1.2.0 zero-only guard rejected all updates
+from 23:14 on 2026-10-20, despite the daemon continuing to poll after sleep/wake.
+The quota-only fixture `weekly-exhausted-reset.json` covers this variant at a
+fixed observation time. Disabled status takes precedence over the fraction in
+the display; range and exhausted-weekly checks still apply in parser and cache.
 
 This case caused the 2026-10-20 STALE incident: a successful CLI 1.4.3 response
 was rejected by the old parser's unconditional reset requirement, leaving both

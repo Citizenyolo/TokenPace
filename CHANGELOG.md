@@ -8,6 +8,13 @@ corrections to older parsing/observation descriptions, see the
 
 ## [Unreleased]
 
+### Fixed
+- Accept finite fractions from 0 to 1 for disabled five-hour buckets after weekly
+  exhaustion, including the upstream 100% response after the five-hour reset.
+  Preserve the reported value in the cache while displaying an empty, unavailable
+  bar and `N/A`; continue refreshing the other quotas. Add coverage for both model
+  groups, cache validation and invalid disabled fractions.
+
 ## [1.2.0] - 2026-10-20
 
 ### Changed
