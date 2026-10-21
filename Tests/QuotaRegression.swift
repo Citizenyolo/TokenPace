@@ -48,6 +48,16 @@ struct QuotaRegression {
         expect(observed?.claude5hResetTime == "", "no invented five-hour reset")
         expect(observed?.gemini5hRemaining == 0.8889215588569641, "healthy group retains actual live value")
 
+        // Quota-only capture from the 2026-10-21 incident: disabled fraction reset to one.
+        let resetFixture = fixture.deletingLastPathComponent().appendingPathComponent("weekly-exhausted-reset.json")
+        let resetAt = ISO8601DateFormatter().date(from: "2026-10-21T07:18:21Z")!
+        let resetObserved = QuotaFetcher.parse(try Data(contentsOf: resetFixture), fetchedAt: resetAt)
+        expect(resetObserved?.isFresh(at: resetAt) == true, "real disabled 100 percent response is fresh")
+        expect(resetObserved?.claude5hRemaining == 1 && resetObserved?.claude5hDisabled == true,
+               "disabled fraction remains faithful to upstream without enabling the quota")
+        expect(resetObserved?.geminiWeeklyRemaining == 0.7676821351051331,
+               "healthy quota survives the disabled five-hour reset")
+
         for prefix in ["gemini", "3p"] {
             let original = payload(at: date)
             let weeklyZero = try editBucket(original, id: "\(prefix)-weekly") { $0["remaining_fraction"] = 0.0 }
@@ -71,8 +81,33 @@ struct QuotaRegression {
             let missingActiveReset = try editBucket(exhausted, id: "\(prefix)-5h") { $0["disabled"] = false }
             expect(QuotaFetcher.parse(missingActiveReset, fetchedAt: date) == nil,
                    "active bucket still requires reset")
-            let nonzeroDisabled = try editBucket(exhausted, id: "\(prefix)-5h") { $0["remaining_fraction"] = 0.1 }
-            expect(QuotaFetcher.parse(nonzeroDisabled, fetchedAt: date) == nil, "nonzero disabled bucket rejected")
+            for fraction in [0.1, 1.0] {
+                let nonzeroDisabled = try editBucket(exhausted, id: "\(prefix)-5h") { $0["remaining_fraction"] = fraction }
+                let nonzeroParsed = QuotaFetcher.parse(nonzeroDisabled, fetchedAt: date)!
+                let storedFraction = prefix == "gemini" ? nonzeroParsed.gemini5hRemaining : nonzeroParsed.claude5hRemaining
+                expect(storedFraction == fraction && nonzeroParsed.isFresh(at: date),
+                       "disabled bucket accepts and preserves finite nonzero fraction")
+                let cached = try JSONDecoder().decode(QuotaData.self, from: JSONEncoder().encode(nonzeroParsed))
+                expect(cached == nonzeroParsed && cached.isFresh(at: date), "nonzero disabled cache stays valid")
+                expect(cached.buckets.count == 3 && cached.isFresh(at: date.addingTimeInterval(299))
+                       && !cached.isFresh(at: date.addingTimeInterval(300)),
+                       "nonzero disabled snapshot retains stale boundary and excludes irrelevant reset")
+                let inconsistent = try editBucket(nonzeroDisabled, id: "\(prefix)-weekly") { $0["remaining_fraction"] = 0.1 }
+                expect(QuotaFetcher.parse(inconsistent, fetchedAt: date) == nil,
+                       "nonzero disabled fraction still requires exhausted weekly")
+            }
+            for badFraction: Any in [-0.1, 1.1, "NaN", NSNull()] {
+                let badDisabled = try editBucket(exhausted, id: "\(prefix)-5h") { $0["remaining_fraction"] = badFraction }
+                expect(QuotaFetcher.parse(badDisabled, fetchedAt: date) == nil, "malformed disabled fraction rejected")
+            }
+            let missingFraction = try editBucket(exhausted, id: "\(prefix)-5h") { $0.removeValue(forKey: "remaining_fraction") }
+            expect(QuotaFetcher.parse(missingFraction, fetchedAt: date) == nil, "missing disabled fraction rejected")
+            for badFraction in [-0.1, 1.1, Double.nan, Double.infinity] {
+                var badCache = parsed
+                if prefix == "gemini" { badCache.gemini5hRemaining = badFraction }
+                else { badCache.claude5hRemaining = badFraction }
+                expect(!badCache.isValid(at: date), "cache cannot bypass disabled fraction validation")
+            }
             let nonzeroWeekly = try editBucket(exhausted, id: "\(prefix)-weekly") { $0["remaining_fraction"] = 0.1 }
             expect(QuotaFetcher.parse(nonzeroWeekly, fetchedAt: date) == nil,
                    "disabled state requires exhausted weekly bucket")
@@ -93,9 +128,15 @@ struct QuotaRegression {
             expect(published == [parsed] && coordinator.failures == 0, "disabled response publishes without backoff")
             clock = date.addingTimeInterval(240); coordinator.tick()
             expect(callbacks.count == 1, "disabled response preserves periodic polling")
+            let resetDisabled = try editBucket(exhausted, id: "\(prefix)-5h") { $0["remaining_fraction"] = 1.0 }
+            let resetParsed = QuotaFetcher.parse(resetDisabled, fetchedAt: clock)!
+            callbacks.removeFirst()(resetParsed)
+            expect(published == [parsed, resetParsed] && coordinator.failures == 0,
+                   "disabled fraction reset publishes without entering failure backoff")
+            clock = clock.addingTimeInterval(240); coordinator.tick()
             let recovered = QuotaFetcher.parse(payload(at: clock), fetchedAt: clock)!
             callbacks.removeFirst()(recovered)
-            expect(published == [parsed, recovered] && recovered.gemini5hDisabled != true && recovered.claude5hDisabled != true,
+            expect(published == [parsed, resetParsed, recovered] && recovered.gemini5hDisabled != true && recovered.claude5hDisabled != true,
                    "normal upstream response clears disabled state")
             coordinator.stop()
         }

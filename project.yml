@@ -18,7 +18,7 @@ targets:
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       TOKENPACE_SOURCE_REVISION: unversioned
       MARKETING_VERSION: 1.2.0
-      CURRENT_PROJECT_VERSION: 3
+      CURRENT_PROJECT_VERSION: 4
     info:
       path: Info.plist
       properties:
@@ -46,7 +46,7 @@ targets:
       CODE_SIGN_ENTITLEMENTS: ExtensionEntitlements.entitlements
       TOKENPACE_SOURCE_REVISION: unversioned
       MARKETING_VERSION: 1.2.0
-      CURRENT_PROJECT_VERSION: 3
+      CURRENT_PROJECT_VERSION: 4
     info:
       path: ExtensionInfo.plist
       properties:

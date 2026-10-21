@@ -26,9 +26,12 @@ struct QuotaData: Codable, Equatable {
 
     func isValid(at date: Date) -> Bool {
         // A disabled five-hour bucket is legitimate only when its weekly limit is exhausted.
+        // Its fraction may reset while disabled; preserve it without treating it as usable quota.
         // Its reset is not applicable; never fabricate a five-hour deadline.
-        guard gemini5hDisabled != true || (gemini5hRemaining == 0 && geminiWeeklyRemaining == 0),
-              claude5hDisabled != true || (claude5hRemaining == 0 && claudeWeeklyRemaining == 0) else { return false }
+        guard gemini5hRemaining.isFinite, (0...1).contains(gemini5hRemaining),
+              claude5hRemaining.isFinite, (0...1).contains(claude5hRemaining),
+              gemini5hDisabled != true || geminiWeeklyRemaining == 0,
+              claude5hDisabled != true || claudeWeeklyRemaining == 0 else { return false }
         return buckets.allSatisfy { fraction, reset, duration in
             guard fraction.isFinite, (0...1).contains(fraction),
                   let end = QuotaPolicy.resetDate(reset) else { return false }

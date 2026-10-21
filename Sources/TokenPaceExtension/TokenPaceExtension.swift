@@ -142,7 +142,7 @@ struct TokenPaceEntryView : View {
                             GridRow {
                                 HStack(spacing: 0) {
                                     Text("  [")
-                                    QuotaBar(percentage: d.gemini5hRemaining).opacity(d.gemini5hDisabled == true ? 0.4 : 1)
+                                    QuotaBar(percentage: d.gemini5hDisabled == true ? 0 : d.gemini5hRemaining).opacity(d.gemini5hDisabled == true ? 0.4 : 1)
                                     Text("] ")
                                 }
                                 PercentageColumn {
@@ -195,7 +195,7 @@ struct TokenPaceEntryView : View {
                                 GridRow {
                                     HStack(spacing: 0) {
                                         Text("  [")
-                                        QuotaBar(percentage: d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
+                                        QuotaBar(percentage: d.claude5hDisabled == true ? 0 : d.claude5hRemaining).opacity(d.claude5hDisabled == true ? 0.4 : 1)
                                         Text("] ")
                                     }
                                     PercentageColumn {
