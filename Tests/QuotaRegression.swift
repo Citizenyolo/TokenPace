@@ -340,6 +340,22 @@ struct QuotaRegression {
         expect(Date().timeIntervalSince(start) < 2, "timeout bounded")
         try script("/usr/bin/yes x | /usr/bin/head -c 1500000\n")
         expect(QuotaFetcher.fetchQuota(executable: executable, timeout: 2) == nil, "oversized output bounded without pipe deadlock")
+
+        try script("read line || exit 1\ncat <<'JSON'\n" + liveFixture + "\nJSON\n")
+
+        let originalStdin = dup(STDIN_FILENO)
+        let hangingPipe = Pipe()
+        dup2(hangingPipe.fileHandleForReading.fileDescriptor, STDIN_FILENO)
+
+        let stdinStart = Date()
+        expect(QuotaFetcher.fetchQuota(executable: executable, timeout: 1) == nil, "interactive prompt does not hang (fast fail on /dev/null)")
+        expect(Date().timeIntervalSince(stdinStart) < 0.8, "interactive process fails quickly without waiting")
+
+        dup2(originalStdin, STDIN_FILENO)
+        close(originalStdin)
+        // Keep the write end alive until after the fetch
+        withExtendedLifetime(hangingPipe) {}
+
         print("Passed \(checks) production-code regression checks; no live CLI/network/widget access.")
     }
 }

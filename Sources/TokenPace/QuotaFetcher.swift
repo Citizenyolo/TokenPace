@@ -24,6 +24,7 @@ struct QuotaFetcher {
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
+        task.standardInput = FileHandle.nullDevice
         let output = QuotaOutputBuffer()
         pipe.fileHandleForReading.readabilityHandler = { handle in
             output.drain(handle)
