@@ -33,8 +33,10 @@ struct QuotaData: Codable, Equatable {
               gemini5hDisabled != true || geminiWeeklyRemaining == 0,
               claude5hDisabled != true || claudeWeeklyRemaining == 0 else { return false }
         return buckets.allSatisfy { fraction, reset, duration in
-            guard fraction.isFinite, (0...1).contains(fraction),
-                  let end = QuotaPolicy.resetDate(reset) else { return false }
+            guard fraction.isFinite, (0...1).contains(fraction) else { return false }
+            // Agy can report full quota with the Unix epoch in place of a deadline.
+            if reset == QuotaPolicy.noResetTimestamp { return fraction == 1 }
+            guard let end = QuotaPolicy.resetDate(reset) else { return false }
             return end > date && end.timeIntervalSince(date) <= duration + 60
         }
     }
@@ -43,7 +45,10 @@ struct QuotaData: Codable, Equatable {
         guard let fetchedAt, fetchedAt <= date,
               date.timeIntervalSince(fetchedAt) < QuotaPolicy.staleAfter,
               isValid(at: fetchedAt) else { return false }
-        return buckets.allSatisfy { QuotaPolicy.resetDate($0.1).map { $0 > date } ?? false }
+        return buckets.allSatisfy { _, reset, _ in
+            if reset == QuotaPolicy.noResetTimestamp { return true } // Validated above.
+            return QuotaPolicy.resetDate(reset).map { $0 > date } ?? false
+        }
     }
 }
 
@@ -58,8 +63,10 @@ enum QuotaPolicy {
     static let pollInterval: TimeInterval = 240
     static let staleAfter: TimeInterval = 300
     static let fetchTimeout: TimeInterval = 30
+    static let noResetTimestamp = "1970-01-01T00:00:00Z"
 
     static func resetDate(_ value: String) -> Date? {
+        guard value != noResetTimestamp else { return nil }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = formatter.date(from: value) { return date }

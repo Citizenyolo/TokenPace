@@ -147,9 +147,43 @@ struct QuotaRegression {
         expect(decoded.isFresh(at: date), "old installed caches without disabled fields still decode fresh")
     }
 
+    static func noResetQuotaChecks(at date: Date) throws {
+        let epoch = "1970-01-01T00:00:00Z"
+        let original = payload(at: date)
+        let weekly = try editBucket(original, id: "3p-weekly") {
+            $0["remaining_fraction"] = 1.0
+            $0["reset_time"] = epoch
+        }
+        let response = try editBucket(weekly, id: "3p-5h") {
+            $0["remaining_fraction"] = 1.0
+            $0["reset_time"] = epoch
+        }
+        let parsed = QuotaFetcher.parse(response, fetchedAt: date)
+        expect(parsed?.isFresh(at: date) == true, "Unix epoch with full quota must not freeze the snapshot")
+        let data = parsed!
+        expect(data.gemini5hRemaining == 0.31 && data.geminiWeeklyRemaining == 0.42,
+               "Gemini quotas publish with their reported values")
+        expect(data.claude5hRemaining == 1 && data.claudeWeeklyRemaining == 1,
+               "full Claude/GPT quotas are preserved")
+        expect(QuotaPolicy.resetDate(data.claude5hResetTime) == nil
+               && QuotaPolicy.resetDate(data.claudeWeeklyResetTime) == nil,
+               "epoch produces no reset countdown, pacing or refresh trigger")
+        let cached = try JSONDecoder().decode(QuotaData.self, from: JSONEncoder().encode(data))
+        expect(cached.isFresh(at: date.addingTimeInterval(299)), "no-reset state survives cache roundtrip")
+        expect(!cached.isFresh(at: date.addingTimeInterval(300)), "no-reset snapshot still ages stale")
+
+        let partial = try editBucket(response, id: "3p-5h") { $0["remaining_fraction"] = 0.25 }
+        expect(QuotaFetcher.parse(partial, fetchedAt: date) == nil, "partial quota requires a real reset")
+        let expired = try editBucket(response, id: "3p-5h") {
+            $0["reset_time"] = ISO8601DateFormatter().string(from: date.addingTimeInterval(-1))
+        }
+        expect(QuotaFetcher.parse(expired, fetchedAt: date) == nil, "an ordinary expired reset is still rejected")
+    }
+
     static func main() throws {
         let date = Date(timeIntervalSince1970: 1_800_000_000)
         try disabledQuotaChecks(at: date)
+        try noResetQuotaChecks(at: date)
         let bytes = payload(at: date)
         let data = QuotaFetcher.parse(bytes, fetchedAt: date)!
         expect(data.gemini5hRemaining == 0.31 && data.claude5hRemaining == 0.13, "actual fractions preserved")
