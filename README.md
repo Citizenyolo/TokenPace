@@ -29,7 +29,7 @@ This builds and ad-hoc signs the app and extension, installs to
 It replaces an existing TokenPace installation and restarts its processes.
 Then add **TokenPace** from the macOS desktop or Notification Center widget gallery.
 Choose **Medium** for Gemini (Antigravity) only, or **Large** for Gemini (Antigravity) and Claude/GPT.
-The commands above use current `main`; [v1.2.0](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.2.0)
+The commands above use current `main`; [v1.2.1](https://github.com/Citizenyolo/TokenPace/releases/tag/v1.2.1)
 is also available as source. No prebuilt or notarized app is included.
 
 See the [installation guide](docs/installation.md) for Xcode setup, installation
@@ -42,6 +42,8 @@ see [Contributing](CONTRIBUTING.md#build-without-installing).
   Antigravity (Agy). It does **not** represent the separate Gemini chat allowance
   included with Google AI Pro.
 - **Remaining quota** and **Resets in** come from Agy's reported fractions and deadlines.
+  A full bucket reported with the Unix epoch as its reset shows `100%` and
+  `Unknown reset time` without a pacing indicator.
 - **Pacing** compares remaining quota with an even allowance over the cycle:
   green above +2 percentage points, blue within ±2, red below −2, after rounding.
   It is not a measured tokens-per-minute burn rate or a time-left prediction.

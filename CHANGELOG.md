@@ -6,14 +6,14 @@ Release entries retain their historical wording. For current behavior and explic
 corrections to older parsing/observation descriptions, see the
 [architecture audit notes](docs/architecture.md#documentation-audit-corrections).
 
-## [Unreleased]
+## [1.2.1] - 2026-11-25
 
 ### Fixed
-- Accept finite fractions from 0 to 1 for disabled five-hour buckets after weekly
-  exhaustion, including the upstream 100% response after the five-hour reset.
-  Preserve the reported value in the cache while displaying an empty, unavailable
-  bar and `N/A`; continue refreshing the other quotas. Add coverage for both model
-  groups, cache validation and invalid disabled fractions.
+- Accept the Unix epoch reset placeholder for full quota buckets so Claude/GPT
+  placeholders cannot block Gemini refreshes. Show `100%` and `Unknown reset time`.
+- Accept valid fractions for disabled five-hour buckets after weekly exhaustion,
+  including 100% after a reset. Continue showing the disabled bucket as `N/A`.
+- Give background Agy reads an empty stdin so prompts fail promptly.
 
 ## [1.2.0] - 2026-10-20
 
@@ -62,25 +62,4 @@ Source release for the accepted quota freshness/recovery fix. Install from sourc
 - **Cache Staleness Logic:** The widget now correctly detects when an explicit reset timestamp has expired and conservatively signals "Data stale". *(Note: comprehensive network/data-age tracking is still [WIP in ISSUE1 (#2)](https://github.com/Citizenyolo/TokenPace/issues/2)).*
 - **Quota Synchronization:** `QuotaObserver` now utilizes an exponential backoff loop for transient network failures. Strict sequence IDs ensure that obsolete, delayed network responses can no longer silently overwrite fresh data fetches.
 
-## [1.1.0] - 2026-10-02
-### Added
-- Dark Mode Support: The widget now natively supports macOS Dark Mode. Text and background colors dynamically adapt to the system appearance setting for a seamless visual experience.
-
-## [1.0.2] - 2026-10-02
-### Changed
-- Improved remaining time formatting: displays as "Resets in X days Yh Zm" for durations over 24 hours.
-- Shortened "Refreshes in" to "Resets in" to improve layout in the weekly view.
-
-## [1.0.1] - 2026-09-30
-### Fixed
-- Fixed an issue where the installation script would silently erase the `com.apple.security.app-sandbox` entitlement during the XcodeGen phase, causing macOS to reject the widget.
-- Restored explicit `app-sandbox` property injection into `project.yml` for correct build generation.
-
-## [1.0.0] - 2026-09-30
-### Added
-- Initial release of TokenPace.
-- Support for monitoring Gemini and Claude/GPT API usage.
-- Dual 5-hour and Weekly cycle tracking.
-- Live pacing/burn-rate calculation (Conserving, On Track, Overburn).
-- Headless daemon with SQLite database observation.
-- Optimistic WidgetKit timelines with delayed authoritative sync.
+See the [previous changelog](https://github.com/Citizenyolo/TokenPace/blob/62a37925e0c00ee2b04290c100f1783a2b21dd17/CHANGELOG.md) for releases 1.0.0 through 1.1.0.
